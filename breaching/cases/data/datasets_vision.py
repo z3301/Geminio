@@ -65,6 +65,12 @@ def _build_dataset_vision(cfg_data, split, can_download=True):
             root=cfg_data.path, split="val", transform=_default_t,
         )
         dataset.lookup = dict(zip(list(range(len(dataset))), [label for (_, label) in dataset.samples]))
+    elif cfg_data.name in ("ChestMNIST", "UAVScenes"):
+        # Placeholder dataset — actual data is provided via custom_data in reconstruction scripts
+        dataset = torchvision.datasets.CIFAR10(
+            root=cfg_data.path, train=split == "training", download=can_download, transform=_default_t,
+        )
+        dataset.lookup = dict(zip(list(range(len(dataset))), dataset.targets))
     else:
         raise ValueError(f"Invalid dataset {cfg_data.name} provided.")
 

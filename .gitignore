@@ -44,3 +44,11 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+
+# Reference papers (copyrighted PDFs)
+papers/
+GEMINIO*.pdf
+
+# Generated PDFs (can be rebuilt from source)
+*.pdf
+!presentation/slides.pdf
