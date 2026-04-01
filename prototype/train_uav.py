@@ -1,16 +1,23 @@
 """
-Phase 3 (UAV): Train malicious models for UAVScenes queries using CLIP ViT-L/14.
+Phase 2 (UAV): Train malicious models for UAVScenes queries using CLIP ViT-L/14.
+
+Supports multiple VLM backends:
+  - "clip"     : Vanilla CLIP ViT-L/14 (768-dim) — original pipeline
+  - "simclip4" : SimCLIP-4 adversarially robust CLIP (768-dim)
+  - "simclip2" : SimCLIP-2 variant (768-dim)
+  - "fare4"    : FARE-4 robust CLIP baseline (768-dim)
 
 Uses multi-label classification (BCEWithLogitsLoss) since UAVScenes images contain
 multiple semantic classes. The Geminio loss surface reshaping works the same way:
-weight each sample's loss by (1 - softmax(clip_similarity * 100)).
+weight each sample's loss by (1 - softmax(clip_similarity * T)).
 
 Usage:
     # First compute embeddings:
-    python prototype/compute_uav_embeddings.py --gpu 0
+    python prototype/compute_embeddings.py --domain uav --vlm clip --gpu 0
+    python prototype/compute_embeddings.py --domain uav --vlm simclip4 --gpu 0
     # Then train:
     python prototype/train_uav.py --query "aerial image of a swimming pool" --gpu 0
-    python prototype/train_uav.py --all --gpu 0
+    python prototype/train_uav.py --all --vlm simclip4 --gpu 0
 """
 import argparse
 import os
@@ -25,7 +32,16 @@ import tqdm
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from prototype.dataset_uav import GeminioUAVScenes, NUM_CLASSES
-from core.vlm import get_text_features
+
+
+def _get_text_features(text, vlm, device):
+    """Get text features from the appropriate VLM backend."""
+    if vlm == 'clip':
+        from core.vlm import get_text_features
+        return get_text_features(text=text, device=device)
+    else:
+        from prototype.vlm_simclip import get_text_features
+        return get_text_features(text=text, vlm=vlm, device=device)
 
 
 class UAVGeminioModel(nn.Module):
@@ -64,10 +80,11 @@ SCENES = ['interval5_AMtown01', 'interval5_HKairport01']
 
 
 def train_query(query, device, data_root=DATA_ROOT, scenes=SCENES,
-                epochs=5, batch_size=16, num_workers=4):
+                epochs=5, batch_size=16, num_workers=4, vlm='clip'):
     """Train a malicious model for a single UAV query."""
     print(f"\n{'='*60}")
     print(f"Training malicious model for query: \"{query}\"")
+    print(f"VLM: {vlm}")
     print(f"Device: {device}")
     print(f"{'='*60}")
 
@@ -78,13 +95,13 @@ def train_query(query, device, data_root=DATA_ROOT, scenes=SCENES,
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
 
-    # Embedding path
+    # Embedding path — use VLM-specific embeddings
     scene_tag = "_".join(scenes)
-    embed_path = os.path.join(data_root, f'uav_clip_embeddings_{scene_tag}.pt')
+    embed_path = os.path.join(data_root, f'uav_{vlm}_embeddings_{scene_tag}.pt')
 
     if not os.path.exists(embed_path):
         print(f"ERROR: Embeddings not found at {embed_path}")
-        print("Run: python prototype/compute_uav_embeddings.py --gpu 0")
+        print(f"Run: python prototype/compute_embeddings.py --domain uav --vlm {vlm} --gpu 0")
         return None
 
     dataset = GeminioUAVScenes(
@@ -104,8 +121,8 @@ def train_query(query, device, data_root=DATA_ROOT, scenes=SCENES,
     loss_fn = nn.BCEWithLogitsLoss(reduction='none')  # multi-label
     epsilon = 1e-8
 
-    # Get query text embedding (CLIP ViT-L/14, 768-dim)
-    query_embeds = get_text_features(text=query, device=device)
+    # Get query text embedding from matching VLM
+    query_embeds = _get_text_features(text=query, vlm=vlm, device=device)
 
     for epoch in range(epochs):
         pbar = tqdm.tqdm(dataloader, total=len(dataloader))
@@ -142,7 +159,8 @@ def train_query(query, device, data_root=DATA_ROOT, scenes=SCENES,
     # Save model
     os.makedirs('./malicious_models_uav', exist_ok=True)
     safe_name = query.replace(' ', '_').replace('?', '').replace('"', '')[:60]
-    model_path = f'./malicious_models_uav/{safe_name}.pt'
+    suffix = f'_{vlm}' if vlm != 'clip' else ''
+    model_path = f'./malicious_models_uav/{safe_name}{suffix}.pt'
     torch.save(model.clf.state_dict(), model_path)
     print(f"Saved malicious model: {model_path}")
 
@@ -197,6 +215,9 @@ def main():
     parser.add_argument('--epochs', type=int, default=5, help='Training epochs')
     parser.add_argument('--data-root', default=DATA_ROOT)
     parser.add_argument('--scenes', nargs='+', default=SCENES)
+    parser.add_argument('--vlm', type=str, default='clip',
+                        choices=['clip', 'simclip4', 'simclip2', 'fare4'],
+                        help='VLM backend for text-image similarity (default: clip)')
     args = parser.parse_args()
 
     device = f'cuda:{args.gpu}' if torch.cuda.is_available() else 'cpu'
@@ -204,13 +225,13 @@ def main():
     if args.all:
         for query in UAV_QUERIES:
             train_query(query, device, data_root=args.data_root,
-                        scenes=args.scenes, epochs=args.epochs)
+                        scenes=args.scenes, epochs=args.epochs, vlm=args.vlm)
     elif args.query:
         train_query(args.query, device, data_root=args.data_root,
-                    scenes=args.scenes, epochs=args.epochs)
+                    scenes=args.scenes, epochs=args.epochs, vlm=args.vlm)
     else:
         train_query(UAV_QUERIES[0], device, data_root=args.data_root,
-                    scenes=args.scenes, epochs=args.epochs)
+                    scenes=args.scenes, epochs=args.epochs, vlm=args.vlm)
 
     print("\n" + "="*60)
     print("Phase 3 (UAV) complete!")

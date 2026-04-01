@@ -1,13 +1,17 @@
 """
-Phase 2 (Medical): Train malicious models for medical queries using BiomedCLIP + ChestMNIST.
+Phase 2 (Medical): Train malicious models for medical queries using VLM + ChestMNIST.
 
-This is a standalone prototype that doesn't depend on the breaching library.
-It trains a ResNet18 classifier (smaller than ResNet34 for faster iteration)
-with Geminio's loss surface reshaping using BiomedCLIP embeddings.
+Supports multiple VLM backends for computing text-image similarity:
+  - "biomedclip" : BiomedCLIP (512-dim) — original medical pipeline
+  - "clip"       : Vanilla CLIP ViT-L/14 (768-dim)
+  - "simclip4"   : SimCLIP-4 adversarially robust CLIP (768-dim)
+  - "simclip2"   : SimCLIP-2 variant (768-dim)
+  - "fare4"      : FARE-4 robust CLIP baseline (768-dim)
 
 Usage:
     python prototype/train_medical.py --query "Any chest X-ray showing pneumonia" --gpu 0
     python prototype/train_medical.py --all --gpu 0
+    python prototype/train_medical.py --all --vlm simclip4 --gpu 0
 """
 import argparse
 import os
@@ -23,7 +27,25 @@ import tqdm
 # Add parent dir to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from prototype.dataset_medical import GeminioChestMNIST
-from prototype.vlm_medical import get_text_features
+
+# VLM embedding file paths (relative to data root)
+EMBED_PATHS = {
+    'biomedclip': 'medical-biomedclip-test.pt',
+    'clip': 'medical-clip-test.pt',
+    'simclip4': 'medical-simclip4-test.pt',
+    'simclip2': 'medical-simclip2-test.pt',
+    'fare4': 'medical-fare4-test.pt',
+}
+
+
+def _get_text_features(text, vlm, device):
+    """Get text features from the appropriate VLM backend."""
+    if vlm == 'biomedclip':
+        from prototype.vlm_medical import get_text_features
+        return get_text_features(text=text, device=device)
+    else:
+        from prototype.vlm_simclip import get_text_features
+        return get_text_features(text=text, vlm=vlm, device=device)
 
 
 class MedicalGeminioModel(nn.Module):
@@ -62,10 +84,11 @@ MEDICAL_QUERIES = [
 
 def train_query(query, device, epochs=5, batch_size=16, num_workers=4,
                 temperature=100, output_dir='./malicious_models_medical',
-                pseudo_labels_path=None):
+                pseudo_labels_path=None, vlm='biomedclip'):
     """Train a malicious model for a single medical query."""
     print(f"\n{'='*60}")
     print(f"Training malicious model for query: \"{query}\"")
+    print(f"VLM: {vlm}")
     print(f"Device: {device}")
     print(f"{'='*60}")
 
@@ -76,9 +99,21 @@ def train_query(query, device, epochs=5, batch_size=16, num_workers=4,
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
 
-    # Load dataset
+    # Resolve embedding file for selected VLM
+    embed_filename = EMBED_PATHS.get(vlm)
+    if embed_filename is None:
+        raise ValueError(f"Unknown VLM: {vlm}. Choose from: {list(EMBED_PATHS.keys())}")
+    embed_path = os.path.join('./data', embed_filename)
+    if not os.path.exists(embed_path):
+        raise FileNotFoundError(
+            f"Embeddings not found: {embed_path}\n"
+            f"Run: python prototype/compute_embeddings.py --domain medical --vlm {vlm} --gpu 0"
+        )
+
+    # Load dataset with VLM-specific embeddings
     dataset = GeminioChestMNIST(
-        root='./data', split='test', train=True, transform=transform, size=64
+        root='./data', split='test', train=True, transform=transform, size=64,
+        embed_path=embed_path
     )
     dataloader = torch.utils.data.DataLoader(
         dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers
@@ -93,8 +128,8 @@ def train_query(query, device, epochs=5, batch_size=16, num_workers=4,
     loss_fn = nn.CrossEntropyLoss(reduction='none')
     epsilon = 1e-8
 
-    # Get query text embedding
-    query_embeds = get_text_features(text=query, device=device)
+    # Get query text embedding from matching VLM
+    query_embeds = _get_text_features(text=query, vlm=vlm, device=device)
 
     # Load pseudo-labels if specified (overrides dataset.targets)
     if pseudo_labels_path:
@@ -135,8 +170,10 @@ def train_query(query, device, epochs=5, batch_size=16, num_workers=4,
     # Save model
     os.makedirs(output_dir, exist_ok=True)
     safe_name = query.replace(' ', '_').replace('?', '').replace('"', '')
-    # Include temperature and pseudo-label info in filename for ablation tracking
+    # Include VLM, temperature, and pseudo-label info in filename for tracking
     suffix = ''
+    if vlm != 'biomedclip':
+        suffix += f'_{vlm}'
     if temperature != 100:
         suffix += f'_T{int(temperature)}'
     if pseudo_labels_path:
@@ -203,6 +240,9 @@ def main():
     parser.add_argument('--temperature', type=float, default=100, help='Softmax temperature scaling')
     parser.add_argument('--output-dir', type=str, default='./malicious_models_medical', help='Output directory')
     parser.add_argument('--pseudo-labels', type=str, default=None, help='Path to pseudo-labels .pt file')
+    parser.add_argument('--vlm', type=str, default='biomedclip',
+                        choices=['biomedclip', 'clip', 'simclip4', 'simclip2', 'fare4'],
+                        help='VLM backend for text-image similarity (default: biomedclip)')
     args = parser.parse_args()
 
     device = f'cuda:{args.gpu}' if torch.cuda.is_available() else 'cpu'
@@ -210,14 +250,17 @@ def main():
     if args.all:
         for query in MEDICAL_QUERIES:
             train_query(query, device, epochs=args.epochs, temperature=args.temperature,
-                       output_dir=args.output_dir, pseudo_labels_path=args.pseudo_labels)
+                       output_dir=args.output_dir, pseudo_labels_path=args.pseudo_labels,
+                       vlm=args.vlm)
     elif args.query:
         train_query(args.query, device, epochs=args.epochs, temperature=args.temperature,
-                   output_dir=args.output_dir, pseudo_labels_path=args.pseudo_labels)
+                   output_dir=args.output_dir, pseudo_labels_path=args.pseudo_labels,
+                   vlm=args.vlm)
     else:
         # Default: train the first query as a demo
         train_query(MEDICAL_QUERIES[0], device, epochs=args.epochs, temperature=args.temperature,
-                   output_dir=args.output_dir, pseudo_labels_path=args.pseudo_labels)
+                   output_dir=args.output_dir, pseudo_labels_path=args.pseudo_labels,
+                   vlm=args.vlm)
 
     print("\n" + "="*60)
     print("Phase 2 (Medical) complete!")

@@ -16,7 +16,8 @@ from medmnist import ChestMNIST
 class GeminioChestMNIST(Dataset):
     """ChestMNIST dataset with pre-computed BiomedCLIP embeddings for Geminio."""
 
-    def __init__(self, root='./data', split='test', train=None, transform=None, size=64):
+    def __init__(self, root='./data', split='test', train=None, transform=None, size=64,
+                 embed_path=None):
         """
         Args:
             root: Root data directory
@@ -25,6 +26,8 @@ class GeminioChestMNIST(Dataset):
                    If None, use all data.
             transform: Image transform to apply
             size: MedMNIST image size (28 or 64)
+            embed_path: Path to pre-computed embeddings .pt file.
+                        Defaults to '{root}/medical-biomedclip-test.pt' for backward compatibility.
         """
         self.root = root
         self.transform = transform
@@ -34,8 +37,9 @@ class GeminioChestMNIST(Dataset):
         self.info = self.dataset.info
         self.label_names = self.info['label']
 
-        # Load pre-computed BiomedCLIP embeddings
-        embed_path = os.path.join(root, 'medical-biomedclip-test.pt')
+        # Load pre-computed VLM embeddings
+        if embed_path is None:
+            embed_path = os.path.join(root, 'medical-biomedclip-test.pt')
         self.img_embeds = torch.load(embed_path)
 
         # ChestMNIST is multi-label (14 binary labels). For classification we use
