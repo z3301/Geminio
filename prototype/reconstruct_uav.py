@@ -34,6 +34,7 @@ from PIL import Image
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.models import GeminioResNet18
+from prototype.defenses import apply_gradient_pruning, apply_gradient_noise, apply_dpsgd
 import breaching
 
 logging.basicConfig(level=logging.INFO, handlers=[logging.StreamHandler(sys.stdout)], format='%(message)s')
@@ -111,33 +112,6 @@ class UAVCustomData:
             all_imgs = recover_imgs
 
         utl.save_image(all_imgs, save_pth, nrow=batch)
-
-
-def apply_gradient_pruning(gradients, prune_rate):
-    """Prune smallest gradients by magnitude (defense)."""
-    pruned = []
-    for grad in gradients:
-        g = grad.clone()
-        n = int(prune_rate * g.numel())
-        if n > 0:
-            threshold = torch.sort(torch.abs(g).flatten())[0][n - 1]
-            mask = torch.abs(g) > threshold
-            g *= mask
-        pruned.append(g)
-    return pruned
-
-
-def apply_gradient_noise(gradients, noise_scale, distribution='laplacian'):
-    """Add noise to gradients (defense)."""
-    noisy = []
-    for grad in gradients:
-        g = grad.clone()
-        if distribution == 'laplacian':
-            noise = torch.distributions.Laplace(0, noise_scale).sample(g.shape).to(g.device)
-        else:
-            noise = torch.distributions.Normal(0, noise_scale).sample(g.shape).to(g.device)
-        noisy.append(g + noise)
-    return noisy
 
 
 def compute_metrics(reconstructed_user_data, true_user_data, setup):
@@ -220,6 +194,7 @@ def compute_attack_f1(model, loss_fn, rec_data, true_data, setup, threshold=0.90
 
 
 def reconstruct_uav(cfg, setup, query=None, prune_rate=0.0, noise_scale=0.0,
+                    dpsgd_epsilon=0.0, dpsgd_delta=1e-5, dpsgd_max_grad_norm=1.0,
                     data_dir='./assets/uav_samples/', model_path=None):
     """Reconstruct private UAV/drone images using baseline or query-based approach."""
     num_classes = cfg.case.data.classes  # 18
@@ -286,6 +261,19 @@ def reconstruct_uav(cfg, setup, query=None, prune_rate=0.0, noise_scale=0.0,
     if noise_scale > 0:
         print(f"Applying gradient noise defense: Laplacian scale={noise_scale}")
         shared_data["gradients"] = apply_gradient_noise(shared_data["gradients"], noise_scale)
+    if dpsgd_epsilon > 0:
+        print(f"Applying DP-SGD defense: epsilon={dpsgd_epsilon}, delta={dpsgd_delta}, C={dpsgd_max_grad_norm}")
+        shared_data["gradients"], dpsgd_info = apply_dpsgd(
+            shared_data["gradients"],
+            epsilon=dpsgd_epsilon,
+            delta=dpsgd_delta,
+            max_grad_norm=dpsgd_max_grad_norm,
+            batch_size=cfg.case.user.num_data_points,
+        )
+        print(f"  Global norm before clip: {dpsgd_info['global_norm_before_clip']:.4f}")
+        print(f"  Clip factor: {dpsgd_info['clip_factor']:.4f}")
+        print(f"  Noise sigma: {dpsgd_info['sigma']:.6f}")
+        print(f"  Noise std per element: {dpsgd_info['noise_std_per_element']:.6f}")
 
     # Save ground truth
     true_path = cfg.attack.save_dir + 'a_truth.jpg'
@@ -334,6 +322,9 @@ def reconstruct_uav(cfg, setup, query=None, prune_rate=0.0, noise_scale=0.0,
     metrics['query'] = query or 'baseline'
     metrics['prune_rate'] = prune_rate
     metrics['noise_scale'] = noise_scale
+    metrics['dpsgd_epsilon'] = dpsgd_epsilon
+    metrics['dpsgd_delta'] = dpsgd_delta
+    metrics['dpsgd_max_grad_norm'] = dpsgd_max_grad_norm
     metrics['domain'] = 'uav'
 
     # Save metrics
@@ -354,6 +345,9 @@ if __name__ == '__main__':
     # Defense arguments
     parser.add_argument('--prune-rate', type=float, default=0.0, help='Gradient pruning rate (0-0.99)')
     parser.add_argument('--noise-scale', type=float, default=0.0, help='Gradient noise scale (Laplacian)')
+    parser.add_argument('--dpsgd-epsilon', type=float, default=0.0, help='DP-SGD privacy budget epsilon (0=disabled)')
+    parser.add_argument('--dpsgd-delta', type=float, default=1e-5, help='DP-SGD failure probability delta')
+    parser.add_argument('--dpsgd-max-grad-norm', type=float, default=1.0, help='DP-SGD gradient clipping norm C')
     # Ablation arguments
     parser.add_argument('--data-dir', type=str, default='./assets/uav_samples/', help='Sample directory')
     parser.add_argument('--seed', type=int, default=None, help='Random seed for reproducibility')
@@ -383,6 +377,8 @@ if __name__ == '__main__':
         defense_tag += f'_prune{args.prune_rate}'
     if args.noise_scale > 0:
         defense_tag += f'_noise{args.noise_scale}'
+    if args.dpsgd_epsilon > 0:
+        defense_tag += f'_dpsgd_eps{args.dpsgd_epsilon}'
     batch_tag = f'_{args.batch_tag}' if args.batch_tag else ''
     cfg.attack.save_dir = f'./results/uav_{query_tag}{defense_tag}{batch_tag}/'
 
@@ -400,5 +396,8 @@ if __name__ == '__main__':
                      query=args.geminio_query if args.geminio_query else None,
                      prune_rate=args.prune_rate,
                      noise_scale=args.noise_scale,
+                     dpsgd_epsilon=args.dpsgd_epsilon,
+                     dpsgd_delta=args.dpsgd_delta,
+                     dpsgd_max_grad_norm=args.dpsgd_max_grad_norm,
                      data_dir=args.data_dir,
                      model_path=args.model_path)
