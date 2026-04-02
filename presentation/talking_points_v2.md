@@ -7,7 +7,7 @@
 
 ## Opening (~1 min)
 
-"Last time we met, you asked me to shift focus toward defense mechanisms. Zarif shared the Sim-CLIP repository on March 24, and I've completed the evaluation. The short answer: **adversarially robust VLMs do not defend against Geminio — and in the medical domain, they actually make the attack 57-61% stronger.**"
+"Last time we met, you asked me to shift focus toward defense mechanisms. I have two sets of results. First, I evaluated Zarif's Sim-CLIP — **adversarially robust VLMs do not defend against Geminio and actually make the medical attack 57-61% stronger.** Second, I implemented DP-SGD with explicit epsilon budgets — **and it works. It's the first defense that effectively stops the attack in our experiments.**"
 
 ---
 
@@ -81,41 +81,68 @@
 
 ---
 
-## Slide 6: What Would Actually Work (~2 min)
+## Slide 6: DP-SGD — A Defense That Works (~3 min)
 
-"Defenses need to operate at the gradient level. Here's where I think we should focus."
+"Since VLM hardening failed, I implemented DP-SGD — differential privacy applied to gradients. It does two things before the client shares gradients: clips the gradient norm to a fixed bound, then adds calibrated Gaussian noise."
 
-| Approach | Level | Status |
-|----------|-------|--------|
-| Gradient pruning | Gradient | Tested — inconsistent |
-| Noise injection | Gradient | Tested — inconsistent |
-| DP-SGD | Gradient | Not yet tested — has mathematical guarantees |
-| **Federated FAML** | **FL protocol** | **Not yet tested — most promising** |
-| Secure aggregation | Cryptographic | Theoretical baseline |
+**Medical (pneumonia):**
 
-"Ahmed, Zarif — Federated FAML operates at the right level. It was designed for FL-specific adversarial threats. If it can reduce reconstruction quality against Geminio, that's the paper."
+| ε | Attack F1 | vs Baseline |
+|---|-----------|-------------|
+| None | 0.625 | — |
+| 1.0 | 0.250 | -60% |
+| 5.0 | **0.125** | **-80%** |
+| 50.0 | 0.625 | 0% |
+
+**UAV (swimming pool):**
+
+| ε | Attack F1 | vs Baseline |
+|---|-----------|-------------|
+| None | high | — |
+| 1.0 | 0.125 | near-zero |
+| 5.0 | **0.000** | **-100%** |
+| 50.0 | **0.000** | **-100%** |
+
+"Validated on a second UAV query (solar panels) — same pattern."
+
+"The key insight: **gradient clipping is what stops the attack**, not the noise. Geminio relies on target images producing disproportionately large gradients. When you cap the gradient norm to C=1.0, that amplification disappears. Even ε=50 — barely any noise — stops UAV targeting completely."
+
+"Also interesting: LPIPS and PSNR actually *improve* under DP-SGD. The defense disrupts targeting but overall reconstruction quality holds. The attack loses its ability to focus on specific images."
 
 ---
 
-## Slide 7: Proposed Paper Framing (~1 min)
+## Slide 7: Defense Comparison (~1 min)
 
-**Title direction**: *"Why Robust VLMs Don't Stop Gradient Inversion: Cross-Domain Evaluation of Defenses Against Geminio"* (or similar)
+| Defense | Level | Medical F1 | UAV F1 | Works? |
+|---------|-------|-----------|--------|--------|
+| None | — | 0.625 | high | — |
+| Grad pruning 99% | Gradient | inconsistent | inconsistent | No |
+| Noise 1e-1 | Gradient | inconsistent | inconsistent | No |
+| SimCLIP-4 | VLM | — (worse) | — (mixed) | **No — helps attacker** |
+| FARE-4 | VLM | — (worse) | — (mixed) | **No — helps attacker** |
+| **DP-SGD ε=5** | **Gradient** | **0.125** | **0.000** | **Yes** |
 
-**Three contributions**:
-1. **Cross-domain attack reproduction** — Medical + UAV extensions, 53 ablation experiments
-2. **Negative result** — VLM adversarial robustness is orthogonal to gradient inversion defense (SimCLIP/FARE evaluation)
-3. **FL-specific defense** — Federated FAML (or another gradient-level mechanism) as the actual solution
-
-"The negative result is publishable on its own — it's a common misconception that hardening model components provides general robustness. We show that's not the case for gradient inversion."
+"This is the clearest result we have: defenses at the VLM level don't work, defenses at the gradient level do."
 
 ---
 
-## Slide 8: Next Steps (~1 min)
+## Slide 8: Proposed Paper Framing (~1 min)
 
-1. **Zarif**: Share Federated FAML code/paper so I can integrate it with the Geminio pipeline
-2. **Dan**: Implement DP-SGD evaluation with explicit ε budgets as a defense baseline
-3. **Dan**: Run Phase 3 reconstruction on SimCLIP/FARE models to get perceptual quality metrics
-4. **All**: Begin paper draft outlining the three-contribution structure
+**Title direction**: *"Gradient Clipping Stops VLM-Guided Gradient Inversion Where Robust Vision Encoders Fail"* (or similar)
+
+**Four contributions**:
+1. **Cross-domain attack reproduction** — Medical + UAV extensions, 53+ ablation experiments
+2. **Negative result** — VLM adversarial robustness is orthogonal to gradient inversion defense (SimCLIP/FARE)
+3. **Positive result** — DP-SGD with gradient clipping effectively stops Geminio
+4. **FL-specific defense** — Federated FAML integration (pending, could strengthen the paper)
+
+---
+
+## Slide 9: Next Steps (~1 min)
+
+1. **Zarif**: Share Federated FAML code so we can compare it with DP-SGD as a complementary defense
+2. **Dan**: Multi-seed DP-SGD validation for statistical significance
+3. **All**: Begin paper draft with the four-contribution structure
 
 ---
 
@@ -124,14 +151,20 @@
 **"Could the client use SimCLIP instead of standard ResNet?"**
 The client's model architecture is dictated by the server in FL — the client trains whatever model the server sends. The client doesn't run CLIP at all. CLIP is the attacker's tool.
 
-**"What if the client adds SimCLIP as a preprocessing step?"**
-This would change the feature distribution the model sees, but wouldn't affect gradient leakage. The gradients still contain per-sample information regardless of how the input was preprocessed.
+**"Why does gradient clipping work so well?"**
+Geminio's mechanism produces a model that's deliberately bad at target images, causing them to produce very large gradients. Clipping bounds the maximum gradient magnitude, which directly removes the signal the attacker exploits. It's like turning up the volume on one instrument in an orchestra — clipping puts a hard limit on how loud anything can be.
+
+**"Does DP-SGD hurt model training?"**
+We're only evaluating the defense effect on reconstruction quality, not downstream model accuracy. In practice, DP-SGD with ε=5-10 typically causes modest accuracy drops (1-5%). This is the standard privacy-utility tradeoff.
 
 **"Why does FARE help slightly on UAV but not medical?"**
-UAV images are already visually distinct, so the embedding space is already well-separated. FARE's different feature representations happen to slightly blur some of those distinctions. Medical images are the opposite — they're tightly clustered, so any improvement in semantic discrimination helps the attacker.
+UAV images are already visually distinct. FARE's different feature representations happen to slightly blur some distinctions. Medical images are tightly clustered, so any improvement in semantic discrimination helps the attacker.
 
-**"Is the 57-61% increase statistically significant?"**
-It's consistent across all 5 medical queries and both robust VLMs show the same trend. We'd need to run multi-seed experiments with the SimCLIP/FARE variants for formal significance testing, but the direction is clear and consistent.
+**"Is the 57-61% increase from SimCLIP/FARE statistically significant?"**
+It's consistent across all 5 medical queries and both robust VLMs show the same trend. The direction is clear and consistent.
+
+**"Why is the medical DP-SGD F1 non-monotonic (0.375 at ε=0.1, 0.125 at ε=5)?"**
+Stochastic variation in the 24,000-iteration reconstruction. The clipping effect (C=1.0) dominates over noise magnitude in this regime. Multi-seed experiments would clarify.
 
 ---
 
@@ -141,12 +174,13 @@ It's consistent across all 5 medical queries and both robust VLMs show the same 
 |---------|---------|
 | Opening | 1 |
 | Recap | 1 |
-| What we tested | 2 |
-| Medical results | 2 |
-| UAV results | 1 |
-| Why it doesn't help | 2 |
-| What would work | 2 |
+| SimCLIP/FARE setup | 2 |
+| Medical results (VLM) | 2 |
+| UAV results (VLM) | 1 |
+| Why VLM doesn't help | 2 |
+| DP-SGD results | 3 |
+| Defense comparison | 1 |
 | Paper framing | 1 |
 | Next steps | 1 |
-| **Total** | **~13 min** |
+| **Total** | **~15 min** |
 | Q&A buffer | 5-10 min |

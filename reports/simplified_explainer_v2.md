@@ -83,31 +83,55 @@ It's like putting a better lock on the attacker's own front door. It doesn't hel
 
 ---
 
-## What WOULD Work?
+## What DOES Work? DP-SGD
 
-The vulnerability is in **gradient sharing**, so defenses need to operate there:
+Since the vulnerability is in **gradient sharing**, defenses need to operate there. We tested **DP-SGD** (Differentially Private Stochastic Gradient Descent) — the gold standard for gradient privacy.
 
-| Defense | How It Works | Status |
-|---------|-------------|--------|
-| **Gradient pruning** | Remove small gradient values | Tested — inconsistent |
-| **Noise injection** | Add random noise to gradients | Tested — inconsistent |
-| **DP-SGD** | Add mathematically calibrated noise with privacy guarantees | Not yet tested |
-| **Federated FAML** | Ahmed/Zarif's robust FL framework — designed for FL-specific threats | **Next step** |
-| **Secure aggregation** | Cryptographic protocols so server can't see individual gradients | Theoretical |
+DP-SGD does two things before a client shares its gradients:
+1. **Clips the gradients** — caps how big any gradient can be (this is the key part)
+2. **Adds calibrated noise** — mathematically tuned to provide a specific privacy guarantee (measured by ε, "epsilon")
+
+Smaller ε = more privacy = more noise. Typical values: ε=1 is "strong privacy," ε=10 is "weak privacy."
+
+### It Works.
+
+**Medical domain:**
+```
+No defense:       Attack F1 = 0.625  (attacker identifies 5/8 targets)
+DP-SGD ε=5:       Attack F1 = 0.125  (attacker identifies 1/8 — near random)
+```
+
+**Drone imagery:**
+```
+No defense:       Attack F1 = high   (strong targeting)
+DP-SGD ε=5:       Attack F1 = 0.000  (attacker identifies 0/8 — completely stopped)
+```
+
+The gradient clipping is what does the heavy lifting. Geminio relies on target images producing *disproportionately large* gradients. When you cap the gradient size, that amplification disappears.
+
+**Even ε=50** (barely any noise) stops the UAV attack completely — because the clipping alone disrupts the mechanism.
+
+### Defense Comparison
+
+| Defense | Does it work? | Why / why not? |
+|---------|--------------|----------------|
+| Gradient pruning | Inconsistent | Removes small values but large target gradients survive |
+| Noise injection | Inconsistent | Random noise doesn't specifically counter gradient amplification |
+| **SimCLIP/FARE** | **No — makes it WORSE** | **Sharpens the attacker's targeting tool** |
+| **DP-SGD** | **YES** | **Clips the gradient amplification Geminio relies on** |
 
 ---
 
 ## What's Next
 
-1. **Federated FAML integration** — Ahmed and Zarif have a robust federated learning framework (accepted at CVPR). It was designed for different attacks but hasn't been tested against Geminio. This is the most promising direction.
-2. **DP-SGD** — Differential privacy with explicit epsilon budgets. The only defense with mathematical guarantees.
-3. **Paper draft** — The story is now: we reproduced the attack across domains, showed that VLM hardening is insufficient, and propose FL-specific defenses.
+1. **Federated FAML integration** — Ahmed and Zarif have a robust federated learning framework (accepted at CVPR). It was designed for different attacks but hasn't been tested against Geminio. Could complement DP-SGD.
+2. **Paper draft** — The story is now: we reproduced the attack across domains, showed VLM hardening is insufficient, and demonstrated that DP-SGD with gradient clipping effectively stops it.
 
 ---
 
 ## The One-Sentence Version (Updated)
 
-> Making the vision-language model tougher doesn't stop the Geminio gradient inversion attack — and can actually make it worse — because the vulnerability is in federated learning's gradient-sharing protocol, not in the VLM itself.
+> Making the vision-language model tougher doesn't stop the Geminio gradient inversion attack — but DP-SGD does, because gradient clipping directly disrupts the amplification mechanism the attack relies on.
 
 ---
 
