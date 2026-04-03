@@ -9,15 +9,17 @@ Defenses:
   - Gradient pruning (Zhu et al., NeurIPS 2019)
   - Gradient noise injection (Laplacian/Gaussian)
   - DP-SGD (Abadi et al., CCS 2016) — per-sample clipping + calibrated Gaussian noise
+  - FedAvg multi-epoch (McMahan et al., AISTATS 2017) — multiple local SGD steps
 
 Usage:
     from prototype.defenses import apply_dpsgd, apply_gradient_pruning, apply_gradient_noise
+    from prototype.defenses import simulate_fedavg
 
     # DP-SGD with epsilon=1.0
     defended = apply_dpsgd(gradients, epsilon=1.0, delta=1e-5, max_grad_norm=1.0, batch_size=8)
 
-    # Gradient pruning at 90%
-    defended = apply_gradient_pruning(gradients, prune_rate=0.90)
+    # FedAvg with 5 local epochs
+    defended = simulate_fedavg(model, server_payload, custom_data, loss_fn, local_epochs=5, local_lr=1e-3)
 """
 import math
 import torch
@@ -151,5 +153,95 @@ def apply_dpsgd(gradients, epsilon, delta=1e-5, max_grad_norm=1.0, batch_size=1)
         'clip_factor': clip_factor,
         'sigma': sigma,
         'noise_std_per_element': noise_std,
+        'batch_size': batch_size,
+    }
+
+
+def simulate_fedavg(model, server_payload, custom_data, loss_fn, setup,
+                    local_epochs=1, local_lr=1e-3, data_key='inputs'):
+    """
+    Simulate FedAvg multi-epoch local training and return the parameter update.
+
+    Instead of computing a single gradient (FedSGD), the client runs multiple
+    local SGD steps on the received model and shares the parameter difference
+    (new_params - old_params). This "washes out" the malicious patterns that
+    Geminio introduces, because each SGD step modifies the model further from
+    the attacker's carefully crafted state.
+
+    The Geminio paper (Shan et al., ICCV 2025) showed that FedAvg weakens the
+    attack, especially with more local epochs and larger learning rates.
+
+    Args:
+        model: The FL model (already loaded with server weights)
+        server_payload: Dict with 'parameters' and 'buffers' from server
+        custom_data: Dict with 'inputs' and 'labels' tensors
+        loss_fn: Loss function (CrossEntropyLoss or BCEWithLogitsLoss)
+        setup: Dict with 'device' and 'dtype'
+        local_epochs: Number of local training epochs (1 = FedSGD equivalent,
+                      higher = more defense). Paper tested 1-32.
+        local_lr: Local SGD learning rate. Paper used 1e-6 to 1e-3.
+                  Smaller lr = less model change per step = weaker defense.
+        data_key: Key for input data in custom_data dict
+
+    Returns:
+        (shared_grads, fedavg_info) where shared_grads is a list of
+        parameter-difference tensors (same format as single-step gradients)
+
+    Reference:
+        McMahan et al., "Communication-Efficient Learning of Deep Networks
+        from Decentralized Data", AISTATS 2017.
+    """
+    parameters = server_payload["parameters"]
+
+    # Save original server parameters
+    original_params = [p.clone().detach() for p in parameters]
+
+    # Move model to device and load server parameters
+    model.to(**setup)
+    with torch.no_grad():
+        for param, server_state in zip(model.parameters(), parameters):
+            param.copy_(server_state.to(**setup))
+    model.train()
+
+    # Prepare data
+    inputs = custom_data[data_key].to(setup['device'])
+    labels = custom_data['labels'].to(setup['device'])
+    batch_size = inputs.shape[0]
+
+    # Run multiple local SGD steps
+    optimizer = torch.optim.SGD(model.parameters(), lr=local_lr)
+    total_steps = 0
+
+    for epoch in range(local_epochs):
+        # Each epoch: iterate through the batch
+        # With small batches (8 samples), each epoch = 1 step on the full batch
+        optimizer.zero_grad()
+        outputs = model(inputs)
+        loss = loss_fn(outputs, labels)
+        loss.backward()
+        optimizer.step()
+        total_steps += 1
+
+    # Compute parameter difference (what gets shared with server)
+    shared_grads = [
+        (p_local - p_server.to(**setup)).clone().detach()
+        for (p_local, p_server) in zip(model.parameters(), original_params)
+    ]
+
+    # Compute the magnitude of the update
+    update_norm = torch.norm(
+        torch.cat([g.flatten() for g in shared_grads]), p=2
+    ).item()
+
+    # Restore original server parameters (don't contaminate model state)
+    with torch.no_grad():
+        for param, server_state in zip(model.parameters(), parameters):
+            param.copy_(server_state.to(**setup))
+
+    return shared_grads, {
+        'local_epochs': local_epochs,
+        'local_lr': local_lr,
+        'total_steps': total_steps,
+        'update_norm': update_norm,
         'batch_size': batch_size,
     }

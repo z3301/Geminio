@@ -120,7 +120,7 @@ def main():
     parser.add_argument('--domain', required=True, choices=['medical', 'uav'],
                         help='Dataset domain')
     parser.add_argument('--vlm', default='clip',
-                        choices=['clip', 'simclip4', 'simclip2', 'fare4'],
+                        choices=['clip', 'simclip4', 'simclip2', 'fare4', 'fare2', 'tecoa4', 'tecoa2'],
                         help='VLM variant to use')
     parser.add_argument('--gpu', type=int, default=0, help='GPU index')
     parser.add_argument('--batch-size', type=int, default=32)

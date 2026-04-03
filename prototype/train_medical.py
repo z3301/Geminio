@@ -35,6 +35,9 @@ EMBED_PATHS = {
     'simclip4': 'medical-simclip4-test.pt',
     'simclip2': 'medical-simclip2-test.pt',
     'fare4': 'medical-fare4-test.pt',
+    'fare2': 'medical-fare2-test.pt',
+    'tecoa4': 'medical-tecoa4-test.pt',
+    'tecoa2': 'medical-tecoa2-test.pt',
 }
 
 
@@ -241,7 +244,7 @@ def main():
     parser.add_argument('--output-dir', type=str, default='./malicious_models_medical', help='Output directory')
     parser.add_argument('--pseudo-labels', type=str, default=None, help='Path to pseudo-labels .pt file')
     parser.add_argument('--vlm', type=str, default='biomedclip',
-                        choices=['biomedclip', 'clip', 'simclip4', 'simclip2', 'fare4'],
+                        choices=['biomedclip', 'clip', 'simclip4', 'simclip2', 'fare4', 'fare2', 'tecoa4', 'tecoa2'],
                         help='VLM backend for text-image similarity (default: biomedclip)')
     args = parser.parse_args()
 

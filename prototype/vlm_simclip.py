@@ -42,10 +42,12 @@ SIMCLIP_WEIGHT_PATHS = {
     'simclip2': os.path.join(WEIGHT_DIR, 'simclip2.pt'),
 }
 
-# FARE weights are hosted on HuggingFace as open_clip hub models
-FARE_HUB_MODELS = {
+# FARE and TeCoA weights are hosted on HuggingFace as open_clip hub models
+HUB_MODELS = {
     'fare4': 'hf-hub:chs20/fare4-clip',
     'fare2': 'hf-hub:chs20/fare2-clip',
+    'tecoa4': 'hf-hub:chs20/tecoa4-clip',
+    'tecoa2': 'hf-hub:chs20/tecoa2-clip',
 }
 
 # All variants use ViT-L-14 architecture (768-dim embeddings)
@@ -53,7 +55,7 @@ CLIP_MODEL_NAME = 'ViT-L-14'
 CLIP_PRETRAINED = 'openai'
 EMBED_DIM = 768
 
-VALID_VLMS = {'clip', 'simclip4', 'simclip2', 'fare4', 'fare2'}
+VALID_VLMS = {'clip', 'simclip4', 'simclip2', 'fare4', 'fare2', 'tecoa4', 'tecoa2'}
 
 
 def get_vlm_model(vlm='clip', device=None):
@@ -77,9 +79,9 @@ def get_vlm_model(vlm='clip', device=None):
     if cache_key in _model_cache:
         return _model_cache[cache_key], _preprocess_cache[cache_key], _tokenizer_cache[cache_key]
 
-    if vlm in FARE_HUB_MODELS:
-        # FARE models: load entire model from HuggingFace hub (open_clip format)
-        hub_name = FARE_HUB_MODELS[vlm]
+    if vlm in HUB_MODELS:
+        # FARE/TeCoA models: load entire model from HuggingFace hub (open_clip format)
+        hub_name = HUB_MODELS[vlm]
         print(f"Loading {vlm} from {hub_name}...")
         model, _, preprocess = open_clip.create_model_and_transforms(hub_name, device=device)
         tokenizer = open_clip.get_tokenizer(CLIP_MODEL_NAME)

@@ -216,7 +216,7 @@ def main():
     parser.add_argument('--data-root', default=DATA_ROOT)
     parser.add_argument('--scenes', nargs='+', default=SCENES)
     parser.add_argument('--vlm', type=str, default='clip',
-                        choices=['clip', 'simclip4', 'simclip2', 'fare4'],
+                        choices=['clip', 'simclip4', 'simclip2', 'fare4', 'fare2', 'tecoa4', 'tecoa2'],
                         help='VLM backend for text-image similarity (default: clip)')
     args = parser.parse_args()
 

@@ -26,7 +26,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.models import GeminioResNet18
 from core.dataset import CustomData
-from prototype.defenses import apply_gradient_pruning, apply_gradient_noise, apply_dpsgd
+from prototype.defenses import apply_gradient_pruning, apply_gradient_noise, apply_dpsgd, simulate_fedavg
 import breaching
 
 logging.basicConfig(level=logging.INFO, handlers=[logging.StreamHandler(sys.stdout)], format='%(message)s')
@@ -126,6 +126,7 @@ def compute_attack_f1(model, loss_fn, rec_data, true_data, setup, threshold=0.90
 
 def reconstruct_medical(cfg, setup, query=None, prune_rate=0.0, noise_scale=0.0,
                         dpsgd_epsilon=0.0, dpsgd_delta=1e-5, dpsgd_max_grad_norm=1.0,
+                        fedavg_epochs=0, fedavg_lr=1e-3,
                         data_dir='./assets/medical_samples/', model_path=None):
     """Reconstruct private medical images using baseline or query-based approach."""
     # Initialize model (ResNet18, 15 classes for ChestMNIST)
@@ -168,10 +169,24 @@ def reconstruct_medical(cfg, setup, query=None, prune_rate=0.0, noise_scale=0.0,
     )
 
     # Compute local updates (victim's gradient computation)
+    processed_data = cus_data.process_data()
     shared_data, true_user_data = user.compute_local_updates(
         server_payload,
-        custom_data=cus_data.process_data()
+        custom_data=processed_data
     )
+
+    # FedAvg defense: replace single-step gradients with multi-epoch parameter update
+    if fedavg_epochs > 0:
+        print(f"Applying FedAvg defense: {fedavg_epochs} local epochs, lr={fedavg_lr}")
+        shared_data["gradients"], fedavg_info = simulate_fedavg(
+            server.model, server_payload, processed_data,
+            loss_fn=torch.nn.CrossEntropyLoss(),
+            setup=setup,
+            local_epochs=fedavg_epochs,
+            local_lr=fedavg_lr,
+        )
+        print(f"  Total local steps: {fedavg_info['total_steps']}")
+        print(f"  Update norm: {fedavg_info['update_norm']:.4f}")
 
     # Apply defenses to gradients (post-hoc)
     if prune_rate > 0:
@@ -244,6 +259,8 @@ def reconstruct_medical(cfg, setup, query=None, prune_rate=0.0, noise_scale=0.0,
     metrics['dpsgd_epsilon'] = dpsgd_epsilon
     metrics['dpsgd_delta'] = dpsgd_delta
     metrics['dpsgd_max_grad_norm'] = dpsgd_max_grad_norm
+    metrics['fedavg_epochs'] = fedavg_epochs
+    metrics['fedavg_lr'] = fedavg_lr
     metrics['domain'] = 'medical'
 
     # Save metrics
@@ -267,6 +284,8 @@ if __name__ == '__main__':
     parser.add_argument('--dpsgd-epsilon', type=float, default=0.0, help='DP-SGD privacy budget epsilon (0=disabled)')
     parser.add_argument('--dpsgd-delta', type=float, default=1e-5, help='DP-SGD failure probability delta')
     parser.add_argument('--dpsgd-max-grad-norm', type=float, default=1.0, help='DP-SGD gradient clipping norm C')
+    parser.add_argument('--fedavg-epochs', type=int, default=0, help='FedAvg local epochs (0=disabled, use FedSGD)')
+    parser.add_argument('--fedavg-lr', type=float, default=1e-3, help='FedAvg local learning rate')
     # Ablation arguments
     parser.add_argument('--data-dir', type=str, default='./assets/medical_samples/', help='Sample directory')
     parser.add_argument('--seed', type=int, default=None, help='Random seed for reproducibility')
@@ -298,6 +317,8 @@ if __name__ == '__main__':
         defense_tag += f'_noise{args.noise_scale}'
     if args.dpsgd_epsilon > 0:
         defense_tag += f'_dpsgd_eps{args.dpsgd_epsilon}'
+    if args.fedavg_epochs > 0:
+        defense_tag += f'_fedavg_e{args.fedavg_epochs}_lr{args.fedavg_lr}'
     batch_tag = f'_{args.batch_tag}' if args.batch_tag else ''
     cfg.attack.save_dir = f'./results/medical_{query_tag}{defense_tag}{batch_tag}/'
 
@@ -318,5 +339,7 @@ if __name__ == '__main__':
                         dpsgd_epsilon=args.dpsgd_epsilon,
                         dpsgd_delta=args.dpsgd_delta,
                         dpsgd_max_grad_norm=args.dpsgd_max_grad_norm,
+                        fedavg_epochs=args.fedavg_epochs,
+                        fedavg_lr=args.fedavg_lr,
                         data_dir=args.data_dir,
                         model_path=args.model_path)
