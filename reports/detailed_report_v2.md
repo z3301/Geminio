@@ -254,29 +254,60 @@ Implementation: `prototype/defenses.py`, integrated via `--dpsgd-epsilon` flag i
 
 5. **Results validated across queries.** Solar_panels confirms the swimming_pool pattern.
 
-### 8.6 Defense Comparison Summary
+### 8.6 FedAvg Multi-Epoch Defense
 
-| Defense | Level | Medical F1 | UAV F1 | Verdict |
-|---------|-------|-----------|--------|---------|
-| None | — | 0.625 | — | Baseline |
-| Gradient pruning 99% | Gradient | — | — | Inconsistent (Section 5.2 of v1 report) |
-| Noise injection 1e-1 | Gradient | — | — | Inconsistent (Section 5.2 of v1 report) |
-| SimCLIP-4 | VLM | — | — | **Makes attack stronger** (+57% medical) |
-| FARE-4 | VLM | — | — | **Makes attack stronger** (+61% medical) |
-| **DP-SGD ε=5** | **Gradient** | **0.125** | **0.000** | **Effective** |
+The Geminio paper showed FedAvg with multiple local epochs weakens the attack. We tested this systematically.
+
+**Medical (pneumonia_descriptive, lr=1e-3)**
+
+| Local Epochs | LPIPS ↓ | PSNR ↑ | Attack F1 |
+|-------------|---------|--------|-----------|
+| 0 (FedSGD) | 1.019 | 10.86 | 0.625 |
+| 1 | 0.898 | 11.15 | 0.500 |
+| 2 | 0.813 | 11.04 | 0.875 |
+| 5 | 0.918 | 10.87 | **0.000** |
+| 10 | 0.835 | 9.59 | 0.500 |
+| 20 | 0.819 | 10.93 | **0.000** |
+
+**UAV (swimming_pool, lr=1e-3)**
+
+| Local Epochs | LPIPS ↓ | PSNR ↑ | Attack F1 |
+|-------------|---------|--------|-----------|
+| 0 (FedSGD) | 0.679 | 12.88 | — |
+| 1 | 0.660 | 10.79 | 0.125 |
+| 2 | 0.669 | 11.04 | 0.125 |
+| 5 | 0.667 | 10.92 | 0.375 |
+| 10 | 0.668 | 10.90 | 0.250 |
+| 20 | 0.671 | 10.95 | 0.250 |
+
+FedAvg provides some defense but is **inconsistent** — medical F1 is non-monotonic (0.000 at 5 epochs, 0.500 at 10). DP-SGD is more reliable and provides formal privacy guarantees.
+
+### 8.7 Complete Defense Comparison
+
+| Defense | Level | Medical F1 | UAV F1 | Reliable? | Formal Guarantee? |
+|---------|-------|-----------|--------|-----------|-------------------|
+| None (FedSGD) | — | 0.625 | — | — | No |
+| Gradient pruning 99% | Gradient | inconsistent | inconsistent | No | No |
+| Laplacian noise 1e-1 | Gradient | inconsistent | inconsistent | No | No |
+| SimCLIP-4 | VLM | +57% (worse) | -12% | No | No |
+| FARE-4 | VLM | +61% (worse) | -41% | No | No |
+| FedAvg 5 epochs | FL protocol | 0.000 | 0.375 | **Partial** | No |
+| FedAvg 20 epochs | FL protocol | 0.000 | 0.250 | **Partial** | No |
+| **DP-SGD ε=5** | **Gradient** | **0.125** | **0.000** | **Yes** | **Yes (ε,δ)-DP** |
 
 ---
 
 ## 9. Next Steps
 
 ### Immediate
-1. **Share results with Zarif** — SimCLIP/FARE negative result + DP-SGD positive result
-2. **Integrate Federated FAML** — Ahmed/Zarif's robust FL framework (CVPR findings). Compare with DP-SGD as complementary or alternative defense.
+1. **Share results with Zarif** — SimCLIP/FARE negative result + DP-SGD/FedAvg positive results
+2. **Integrate Federated FAML** — Ahmed/Zarif's robust FL framework (CVPR findings). Compare with DP-SGD.
 
 ### Medium-term
-3. **Multi-seed DP-SGD validation** — run across multiple seeds for statistical significance
-4. **Paper draft** — Frame as: (a) cross-domain attack, (b) VLM robustness insufficient (negative), (c) DP-SGD effective (positive), (d) Federated FAML integration
+3. **Combined defenses** — DP-SGD + FedAvg together, DP-SGD + pruning
+4. **Multi-seed validation** for statistical significance
+5. **Paper draft** — cross-domain attack, VLM robustness insufficient, DP-SGD effective, FedAvg analysis, Federated FAML
 
 ### Deprioritized
-5. FEDLEAK/GUIDE comparison
-6. Per-target-image analysis
+6. FEDLEAK/GUIDE comparison
+7. Per-target-image analysis

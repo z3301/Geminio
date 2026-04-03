@@ -288,10 +288,100 @@ done
 
 ---
 
-## 8. Next Steps (Updated)
+## 8. FedAvg Multi-Epoch Defense (April 2, 2026)
+
+### 8.1 Motivation
+
+The Geminio paper (Section 4.3) showed that FedAvg with multiple local epochs weakens the attack because each SGD step modifies the model further from the attacker's crafted state, "washing out" malicious patterns. They tested this qualitatively but didn't evaluate it systematically with metrics.
+
+### 8.2 Implementation
+
+Added `simulate_fedavg()` to `prototype/defenses.py`. Instead of computing a single gradient (FedSGD), the client runs multiple local SGD steps on the received model and shares the parameter difference (new_params - old_params). Integrated via `--fedavg-epochs` and `--fedavg-lr` flags.
+
+### 8.3 Results — Medical (pneumonia_descriptive, lr=1e-3)
+
+| Local Epochs | LPIPS ↓ | PSNR ↑ | Attack F1 |
+|-------------|---------|--------|-----------|
+| 0 (FedSGD) | 1.019 | 10.86 | 0.625 |
+| 1 | 0.898 | 11.15 | 0.500 |
+| 2 | 0.813 | 11.04 | 0.875 |
+| 5 | 0.918 | 10.87 | **0.000** |
+| 10 | 0.835 | 9.59 | 0.500 |
+| 20 | 0.819 | 10.93 | **0.000** |
+
+### 8.4 Results — UAV (swimming_pool, lr=1e-3)
+
+| Local Epochs | LPIPS ↓ | PSNR ↑ | Attack F1 |
+|-------------|---------|--------|-----------|
+| 0 (FedSGD) | 0.679 | 12.88 | — |
+| 1 | 0.660 | 10.79 | 0.125 |
+| 2 | 0.669 | 11.04 | 0.125 |
+| 5 | 0.667 | 10.92 | 0.375 |
+| 10 | 0.668 | 10.90 | 0.250 |
+| 20 | 0.671 | 10.95 | 0.250 |
+
+### 8.5 Analysis
+
+1. **FedAvg provides some defense but is inconsistent.** Medical F1 is non-monotonic (0.875 at 2 epochs, 0.000 at 5, 0.500 at 10, 0.000 at 20). Stochastic variation in the 24K-iteration reconstruction dominates.
+
+2. **UAV F1 stays low (0.125-0.375)** across all epoch counts — even 1 local epoch disrupts targeting. But it doesn't reliably reach 0.000 like DP-SGD.
+
+3. **PSNR degrades for UAV** — drops from 12.88 (FedSGD) to ~10.9 across all FedAvg settings. Multiple local steps degrade overall reconstruction quality.
+
+4. **DP-SGD is the stronger defense.** DP-SGD at ε=5 gives F1=0.125 (medical) and 0.000 (UAV) consistently. FedAvg is less predictable and has no formal privacy guarantees.
+
+5. **Consistent with the paper's findings** — they showed FedAvg weakens the attack, especially with small learning rates. Our results confirm this but add the comparison showing DP-SGD is more reliable.
+
+### 8.6 Complete Defense Comparison
+
+| Defense | Medical F1 | UAV F1 | Reliable? | Formal Guarantee? |
+|---------|-----------|--------|-----------|-------------------|
+| None (FedSGD) | 0.625 | — | — | No |
+| Gradient pruning 99% | inconsistent | inconsistent | No | No |
+| Laplacian noise 1e-1 | inconsistent | inconsistent | No | No |
+| SimCLIP-4 (VLM) | — (worse) | — (mixed) | No | No |
+| FARE-4 (VLM) | — (worse) | — (mixed) | No | No |
+| FedAvg 5 epochs | 0.000 | 0.375 | **Partial** | No |
+| FedAvg 20 epochs | 0.000 | 0.250 | **Partial** | No |
+| **DP-SGD ε=5** | **0.125** | **0.000** | **Yes** | **Yes (ε,δ)-DP** |
+
+### 8.7 Artifacts
+
+Updated code:
+- `prototype/defenses.py` — added `simulate_fedavg()` function
+- Updated `prototype/reconstruct_medical.py` — `--fedavg-epochs`, `--fedavg-lr` flags
+- Updated `prototype/reconstruct_uav.py` — same flags
+
+Results directories:
+- `results/medical_pneumonia_descriptive_fedavg_e{1,2,5,10,20}_lr0.001/`
+- `results/uav_swimming_pool_fedavg_e{1,2,5,10,20}_lr0.001/`
+
+### 8.8 Reproducibility
+
+```bash
+# Medical FedAvg experiments
+for e in 1 2 5 10 20; do
+    python prototype/reconstruct_medical.py \
+        --geminio-query pneumonia_descriptive \
+        --fedavg-epochs $e --gpu 0
+done
+
+# UAV FedAvg experiments
+for e in 1 2 5 10 20; do
+    python prototype/reconstruct_uav.py \
+        --geminio-query swimming_pool \
+        --fedavg-epochs $e --gpu 0
+done
+```
+
+---
+
+## 9. Next Steps (Updated)
 
 1. ~~DP-SGD evaluation~~ **DONE** — effective defense confirmed
-2. **Share results with Zarif** — SimCLIP/FARE negative result + DP-SGD positive result
-3. **Integrate Federated FAML** — test Ahmed/Zarif's robust FL framework (CVPR findings) as a complementary defense
-4. **Validate DP-SGD across more queries** — solar_panels UAV validation running
-5. **Paper draft** — frame as: (a) cross-domain attack, (b) VLM robustness insufficient, (c) DP-SGD effective, (d) Federated FAML integration
+2. ~~FedAvg multi-epoch evaluation~~ **DONE** — partial defense, less reliable than DP-SGD
+3. ~~DP-SGD validation across queries~~ **DONE** — solar_panels confirms swimming_pool results
+4. **Share results with Zarif** — SimCLIP/FARE negative result + DP-SGD/FedAvg positive results
+5. **Integrate Federated FAML** — test Ahmed/Zarif's robust FL framework as complementary defense
+6. **Combined defenses** — DP-SGD + FedAvg together, DP-SGD + pruning together
+7. **Paper draft** — frame as: cross-domain attack, VLM robustness insufficient, DP-SGD effective, FedAvg analysis, Federated FAML
