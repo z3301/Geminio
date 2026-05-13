@@ -1,0 +1,65 @@
+Summary
+The paper studies defenses against Geminio, a recent language-guided gradient inversion attack in federated learning that uses VLMs to semantically target client data. It provides two main results: (i) adversarially robust VLMs (SimCLIP/FARE/TeCoA) do not mitigate and can even exacerbate the attack; and (ii) a simple per-update clipping plus calibrated Gaussian noise mechanism (Norm-Bounded Federated Updates, NBFU) strongly reduces attack success across three reconstruction algorithms, with an analysis arguing the defense’s effectiveness is invariant to the attacker’s gradient-amplification factor. The paper also dissects the distinct roles of clipping and noise via σ=0 ablations and explores batch-size and utility trade-offs.
+
+Strengths
+Technical novelty and innovation
+Clear articulation of why adversarial robustness in VLMs does not transfer to protection against language-guided GIAs due to threat-model mismatch (clean server-side images vs adversarial perturbations).
+A simple, principled defense (per-update L2 clipping plus Gaussian noise) tailored to the active-server/language-guided setting, accompanied by a signal-to-noise argument showing invariance to the attacker’s amplification factor R.
+Insightful σ=0 ablation that separates the contributions of clipping (disrupts scale-sensitive priors) and noise (breaks scale-invariant cosine matching), offering mechanistic understanding beyond the usual DP intuition.
+Experimental rigor and validation
+Evaluation across multiple attacks (HF-GradInv, IG, GradInversion; DLG noted as too weak in this regime), two domains (ChestMNIST and UAVScenes), and multiple seeds, including batch-size sweeps.
+Both the malicious-model “loss ratio” metric and end-to-end F1 are reported, exposing an important difference between targeting strength and invertibility.
+Sensible sanity checks: measurement of pre-clip gradient norms support the analytical claims; ablations (clip-only vs noise+clip) illuminate failure modes when either component is missing.
+Clarity of presentation
+The motivation and threat model are well explained, particularly how language guidance enters the attack pipeline and why improvements in VLMs increase risk.
+The defense’s privacy semantics and sensitivity choice (2C) are presented clearly enough to reconstruct, and the SNR bound is easy to follow.
+Significance of contributions
+Addresses a timely, high-impact risk at the language–vision intersection that is squarely relevant to EMNLP’s VLM community.
+Provides practical guidance for deployment (tuning C and ε, implications of batch size), as well as open-sourcing configs (stated), which will likely be useful to practitioners and researchers.
+Weaknesses
+Technical limitations or concerns
+The claimed DP guarantee is for a per-update aggregate with “substitute-one-record” adjacency but without per-example clipping; while the 2C global sensitivity bound is valid, it is extremely loose and atypical in FL, and the privacy semantics are weaker than standard record-level DP-SGD.
+The evaluation uses model.eval() (fixed BN statistics) for the victim, which several recent works identify as substantially simplifying inversion relative to realistic training-mode clients; this choice may overstate attack strength and thus also the perceived defense margin.
+The title/claim “stop/neutralize” can be overstated given that on medical data the best reported reductions still leave non-trivial F1 (~0.29–0.33), and that the utility analysis indicates ε=5 destabilizes training for the tested setup.
+Utility experiments are limited to classifier-head updates only, whereas the defense’s SNR argument is made in the context of full-model gradients (≈11.3M parameters). Generalization to full-model training under NBFU is unverified.
+Experimental gaps or methodological issues
+Evaluation omits recent generative/denoising-prior attacks (GI-SMN, GI-PIP, GUIDE) that can be more resilient to noisy gradients, as acknowledged; this limits claims of attack-agnostic robustness.
+Geminio’s original evaluations often use larger batch sizes (e.g., 64–256); here, most results are at batch size 8, with partial sweeps to 16/32 only for HF-GradInv due to memory constraints. The defense margin shrinks at n=32 on medical; a broader high-batch study would strengthen conclusions.
+Heavy reliance on an F1 metric defined via a cosine-similarity threshold can be coarse and sensitive at small n; while some cosine results are shown, more comprehensive LPIPS/PSNR and qualitative visualization would help assess practical leakage.
+Clarity or presentation issues
+Some references are placeholders (“?”), and a few figure/table artifacts remain from PDF extraction. The DP discussion would benefit from a more formal statement (adjacency, sensitivity proof, accounting assumptions) and clearer positioning relative to per-example DP-SGD.
+The term “corrected 2C noise calibration” suggests earlier miscalibration; clarify this to avoid confusion.
+Missing related work or comparisons
+More thorough positioning w.r.t. DP-FL literature (e.g., Fed-CDP’s per-example clipping/noise and client- or instance-level guarantees; works like Ziegler et al. applying RDP-Gaussian in FL and reporting leakage reductions) would situate NBFU more precisely.
+Omission of comparisons or discussion with recent inversion advances that incorporate learned priors or denoisers (GI-PIP, GUIDE) limits the generality of the “attack-agnostic” defense claim.
+Detailed Comments
+Technical soundness evaluation
+The SNR bound SNR ≤ C/(σ√d) after clipping and Gaussian noise is a useful back-of-the-envelope explanation for why amplification R drops out; the empirical gradient norms and observed degradation corroborate it.
+The per-update DP guarantee using global sensitivity 2C is mathematically sound but weak for record-level protection compared to per-example clipping (sensitivity scaling with 1/n). The paper is transparent about this but should more explicitly discuss the trade-off in semantics and how to compose across rounds in FL.
+The σ=0 ablation convincingly shows that clipping and noise defend different objective families (e.g., cosine vs Euclidean/prior-weighted). This is a novel and mechanistically insightful finding likely to generalize beyond this setting.
+Experimental evaluation assessment
+Multi-attack, multi-seed, and cross-domain results are strengths; showing both loss ratios and F1 exposes an important nuance about the invertibility of gradient patterns.
+The reliance on model.eval() is a significant external validity concern: recent analyses report that train-mode BatchNorm substantially complicates inversion, changing both attack and defense dynamics. An additional experiment in train mode (even on a subset) would bolster realism.
+The batch-size sweep is informative, but the limited coverage for algorithms other than HF-GradInv and the small n in most experiments temper generality. Given Geminio’s reported strength at n≥64, more large-batch tests would strengthen claims, even if requiring lower-resolution images or smaller models.
+The utility analysis is commendable, but results show that the headline ε=5 regime destabilizes training for classifier-head updates; practitioners need clearer guidance on reconciling defense strength with stable FL (e.g., round-targeted deployment is suggested but not empirically validated in a multi-round FL loop).
+Comparison with related work (using the summaries provided)
+The observation that DP noise reduces inversion success is aligned with prior findings (e.g., Ziegler et al., 2205.03168; 2202.06924), and Fed-CDP (2107.01154) provides stronger instance-level DP via per-example clipping/noise; the novelty here is the explicit focus on language-guided active attacks and the invariance-to-R argument plus the mechanistic σ=0 split.
+Recent attack advances (GI-PIP, GUIDE) indicate that learned priors and denoisers can recover signal even under moderate noise; the paper appropriately flags this limitation but should temper broad claims of attack-agnostic defense until tested.
+Work highlighting realism gaps between inference vs train mode (Valadi et al., 2510.17621; 2202.06924) suggests that the current evaluation might represent a “harder-than-usual attack” regime; nonetheless, the defense likely remains relevant, but the measured margins could differ.
+Discussion of broader impact and significance
+The focus on language-guided attacks is timely for EMNLP, underscoring that progress in VLMs can backfire on privacy. The defense’s independence from VLM quality is an attractive property.
+The paper provides actionable takeaways for practitioners (tuning C, batch-size dependence, complementary roles of clipping/noise) and could serve as a template for evaluating DP-style defenses against future VLM-driven threats.
+Overstatements should be avoided: “stop/neutralize” is accurate for UAV in these tests but not universally; and the utility–privacy tension at ε=5 deserves more thorough treatment in a federated training loop.
+Questions for Authors
+Can you formalize the DP guarantee with a precise adjacency relation, global sensitivity proof for f(B)=clip(average gradient), and the composition/accounting setup across rounds? How does this compare empirically and in formal ε,δ to standard per-example DP-SGD at similar utility?
+How do results change when the client runs in train mode (BatchNorm in training) rather than model.eval()? Could you include at least a subset of experiments to gauge realism, given the known gap between eval vs train mode in GIAs?
+Can you report more comprehensive perceptual metrics (LPIPS/PSNR) and qualitative reconstructions across seeds for the defended vs clean settings to help assess residual privacy leakage visually?
+How sensitive are your results to the choice of C? Could you provide an adaptive C tuning procedure (e.g., percentile targets) and show robustness curves to such choices at fixed ε?
+Have you attempted any evaluation against generative/denoising-prior attacks (GI-PIP, GI-SMN, GUIDE)? If not feasible due to domain models, could you simulate a smaller setup (e.g., CIFAR/Tiny-ImageNet) to test whether the σ=0 mechanism decomposition and NBFU margins persist?
+For the “round-targeted defense” proposal, can you demonstrate a simple detection heuristic (e.g., monitoring parameter shifts or per-sample loss anomalies) and quantify utility impact when NBFU is applied only on flagged rounds in a multi-round FL simulation?
+Overall Assessment
+This paper tackles an important and emerging privacy threat at the intersection of vision and language: semantically targeted, language-guided gradient inversion in federated learning. Its negative result—that adversarially robust VLMs do not mitigate Geminio and may even strengthen it in some domains—is practically valuable. The proposed NBFU defense is simple, principled, and shown to be effective across multiple reconstruction algorithms, with a neat SNR-based rationale and a compelling ablation that clarifies clipping vs noise roles. These contributions, together with practical guidance on tuning and batch-size effects, make the work relevant to EMNLP’s growing interest in VLM safety and privacy.
+
+At the same time, claims should be tempered. The DP semantics rely on a per-update aggregate with a loose 2C sensitivity, which is weaker than standard record-level DP-SGD; the use of eval-mode BatchNorm may overstate attack strength and potentially the defense margin; the title and some language (“stop/neutralize”) are stronger than medical-domain results support; and coverage of stronger learned-prior attacks is missing. The utility analysis also reveals that the strongest defense setting (ε=5) destabilizes training in the tested setup, warranting further validation of the proposed “round-targeted” deployment.
+
+On balance, I find the paper’s core insights and empirical evidence valuable and timely, and I view the work as a useful contribution to the community’s understanding of language-guided GIAs and DP-style defenses. With clarifications on DP semantics, some realism checks (train mode), and toned-down claims, this would be a strong addition. I lean toward acceptance, contingent on addressing the above questions and calibration of claims.

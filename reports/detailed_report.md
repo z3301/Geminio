@@ -173,6 +173,13 @@ Metrics defined as:
 
 | Run | LPIPS ↓ | PSNR ↑ | CW-SSIM ↑ | Attack F1 |
 |-----|---------|--------|-----------|-----------|
+| **ImageNet** ¹ | | | | |
+| Baseline | — | — | — | — |
+| Any jewelry | — | — | — | — |
+| Any human faces | — | — | — | — |
+| Males with a beard | — | — | — | — |
+| Any guns | — | — | — | — |
+| Females riding a horse | — | — | — | — |
 | **Medical** | | | | |
 | Baseline | 0.7927 | 11.32 | 0.3200 | — |
 | Pneumonia (descriptive) | 1.0193 | 10.86 | 0.1878 | — |
@@ -182,7 +189,9 @@ Metrics defined as:
 | Solar panels | 0.6554 | 12.37 | 0.3417 | — |
 | Swimming pool | 0.6786 | 12.88 | 0.3711 | — |
 
-**Analysis**: UAV domain produces better perceptual quality than medical across all metrics. The query-guided models show mixed results vs baseline in overall metrics, because they optimize for target image quality at the expense of non-target images.
+¹ ImageNet reconstruction metrics not computed — only grid JPEG images were saved (no `.pt` tensors). The original Geminio paper (Shan et al., ICCV 2025) also does not report LPIPS/PSNR/CW-SSIM for ImageNet; the paper's quantitative evaluation uses CIFAR-20 (Attack F-1 = 68.13%, Recall = 64.96%, Precision = 65.67% at batch size 256), while ImageNet results are presented as qualitative visual examples only (Figures 4, 33, 34).
+
+**Analysis**: UAV domain produces better perceptual quality than medical across all metrics. The query-guided models show mixed results vs baseline in overall metrics, because they optimize for target image quality at the expense of non-target images. ImageNet metrics are pending tensor-level evaluation.
 
 ### 5.2 Defense Evaluation
 
@@ -232,9 +241,11 @@ All engineering decisions are documented with justification and source reference
 
 | Domain | VLM | Avg Loss Ratio | Best LPIPS | Best PSNR | Best CW-SSIM |
 |--------|-----|---------------|------------|-----------|-------------|
-| ImageNet | CLIP ViT-L/14 | 15.69x | — | — | — |
+| ImageNet ¹ | CLIP ViT-L/14 | 15.69x | — | — | — |
 | Medical | BiomedCLIP | 11.64x | 0.7927 | 13.55 | 0.3787 |
 | UAVScenes | CLIP ViT-L/14 | **91.12x** | **0.6010** | **13.13** | **0.3711** |
+
+¹ ImageNet perceptual metrics not yet computed (`.pt` tensors not saved during original runs). The Geminio paper reports ImageNet results qualitatively only; its quantitative benchmark is CIFAR-20 (Attack F-1 = 68.13% at batch 256).
 
 Key insights:
 1. **Visual distinctiveness drives vulnerability**: Rare, visually unique objects (pools, solar panels) produce dramatically higher loss ratios and better reconstructions.

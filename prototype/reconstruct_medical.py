@@ -195,11 +195,12 @@ def reconstruct_medical(cfg, setup, query=None, prune_rate=0.0, noise_scale=0.0,
     if noise_scale > 0:
         print(f"Applying gradient noise defense: Laplacian scale={noise_scale}")
         shared_data["gradients"] = apply_gradient_noise(shared_data["gradients"], noise_scale)
-    if dpsgd_epsilon > 0:
-        print(f"Applying DP-SGD defense: epsilon={dpsgd_epsilon}, delta={dpsgd_delta}, C={dpsgd_max_grad_norm}")
+    if dpsgd_epsilon != 0:
+        eps_arg = None if dpsgd_epsilon < 0 else dpsgd_epsilon
+        print(f"Applying NBFU defense: epsilon={'clip-only' if eps_arg is None else eps_arg}, delta={dpsgd_delta}, C={dpsgd_max_grad_norm}")
         shared_data["gradients"], dpsgd_info = apply_dpsgd(
             shared_data["gradients"],
-            epsilon=dpsgd_epsilon,
+            epsilon=eps_arg,
             delta=dpsgd_delta,
             max_grad_norm=dpsgd_max_grad_norm,
             batch_size=cfg.case.user.num_data_points,
@@ -262,6 +263,7 @@ def reconstruct_medical(cfg, setup, query=None, prune_rate=0.0, noise_scale=0.0,
     metrics['fedavg_epochs'] = fedavg_epochs
     metrics['fedavg_lr'] = fedavg_lr
     metrics['domain'] = 'medical'
+    metrics['attack'] = cfg.attack.get('type', 'unknown')
 
     # Save metrics
     metrics_path = cfg.attack.save_dir + 'metrics.json'
@@ -291,36 +293,48 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=None, help='Random seed for reproducibility')
     parser.add_argument('--model-path', type=str, default=None, help='Direct path to model .pt file (bypasses query dict)')
     parser.add_argument('--batch-tag', type=str, default=None, help='Tag appended to save directory name')
+    parser.add_argument('--attack', type=str, default='hfgradinv',
+                        choices=['hfgradinv', 'dlg', 'ig', 'gradinversion'],
+                        help='Underlying gradient inversion algorithm applied to Geminio-trapped gradients')
+    parser.add_argument('--bn-train-mode', action='store_true',
+                        help='Run victim in model.train() (BatchNorm uses batch stats) — realism check')
     args = parser.parse_args()
 
     # Initialize configuration
-    cfg = breaching.get_config(overrides=["case=geminio_medical", "attack=hfgradinv"])
+    cfg = breaching.get_config(overrides=["case=geminio_medical", f"attack={args.attack}"])
     cfg.case.user.num_data_points = args.num_samples
     cfg.case.data.partition = "none"
     cfg.case.data.batch_size = args.num_samples
     cfg.case.user.provide_labels = True
-    cfg.attack.optim['signed'] = 'soft'
-    cfg.attack.optim['step_size_decay'] = 'cosine-decay'
-    cfg.attack.optim['warmup'] = 50
+    if args.bn_train_mode:
+        cfg.case.server.provide_public_buffers = False
     cfg.attack.optim['max_iterations'] = args.max_iterations
-    cfg.attack.init = 'patterned-4-randn'
-    # Adjust objective layer range for ResNet18 (66 param tensors vs ResNet34's ~120)
-    cfg.attack.objective['start'] = 50
-    cfg.attack.objective['min_start'] = 15
+    if args.attack == 'hfgradinv':
+        # HF-GradInv hyperparameters tuned for ResNet18 (Geminio default path)
+        cfg.attack.optim['signed'] = 'soft'
+        cfg.attack.optim['step_size_decay'] = 'cosine-decay'
+        cfg.attack.optim['warmup'] = 50
+        cfg.attack.init = 'patterned-4-randn'
+        # Adjust objective layer range for ResNet18 (66 param tensors vs ResNet34's ~120)
+        cfg.attack.objective['start'] = 50
+        cfg.attack.objective['min_start'] = 15
 
     # Set save directory (include defense params in path if applicable)
     query_tag = args.geminio_query or 'baseline'
+    attack_tag = f'_{args.attack}' if args.attack != 'hfgradinv' else ''
     defense_tag = ''
     if args.prune_rate > 0:
         defense_tag += f'_prune{args.prune_rate}'
     if args.noise_scale > 0:
         defense_tag += f'_noise{args.noise_scale}'
-    if args.dpsgd_epsilon > 0:
+    if args.dpsgd_epsilon < 0:
+        defense_tag += '_dpsgd_cliponly'
+    elif args.dpsgd_epsilon > 0:
         defense_tag += f'_dpsgd_eps{args.dpsgd_epsilon}'
     if args.fedavg_epochs > 0:
         defense_tag += f'_fedavg_e{args.fedavg_epochs}_lr{args.fedavg_lr}'
     batch_tag = f'_{args.batch_tag}' if args.batch_tag else ''
-    cfg.attack.save_dir = f'./results/medical_{query_tag}{defense_tag}{batch_tag}/'
+    cfg.attack.save_dir = f'./results/medical_{query_tag}{attack_tag}{defense_tag}{batch_tag}/'
 
     device = torch.device(f'cuda:{args.gpu}') if torch.cuda.is_available() else torch.device('cpu')
     torch.backends.cudnn.benchmark = cfg.case.impl.benchmark
