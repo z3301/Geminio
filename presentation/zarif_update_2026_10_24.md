@@ -92,7 +92,17 @@ The two-factor decomposition: leakage on a sample = (how far the head drives p_y
 
 ## NBFU
 
-The noisy clipped-update defense stays as the defense section. After Holm correction, the defensible claims are that NBFU at ε = 5 defeats Inverting Gradients in both domains (medical 0.59 → 0.82, p = .005; UAV 0.45 → 0.73, p = .002), and defeats the language-guided attack across the 24-query sweep taken as a whole (medical 11 of 12 queries, UAV 12 of 12). Against HF-GradInv at batch 8 the sign is right in both domains but not separable at 3 seeds (p = .056 / .108). Clip-only (σ = 0) gives no measurable protection anywhere, so the noise is the mechanism, not clipping; this corrects the May draft. Batch-16 and batch-32 claims depend on which matching is used, so I will drop them. Four conditions where NBFU appears not to help (medical batch 32, BatchNorm train mode, medical GradInversion, the "indirect" query) are floor effects: the undefended attack already fails there (target LPIPS ≥ 0.7), so I will not report them as the defense failing.
+The noisy clipped-update defense stays as the defense section, with one change I want to flag.
+
+I added a reference I should have had from the start: eight images drawn at random from the same dataset, scored through the identical matching code, as the value an uninformative reconstruction produces. That gives target LPIPS 0.327 (5th to 95th percentile 0.294 to 0.361) on medical and 0.535 (0.485 to 0.571) on UAV. It changes how several numbers read.
+
+On UAV the picture holds. The undefended Inverting Gradients attack sits at 0.453, below the 5th percentile, and ε = 5 moves it to 0.727: the defense removes a signal that was demonstrably present. Eight UAV conditions clear the reference, including three queries, batch 32, two attacker guides and the TeCoA-4 client.
+
+On medical it does not. The undefended attack is at 0.592, already above the medical 95th percentile, and so is every other medical configuration in the project, across both client architectures, all 24 queries and all seven guides. The best medical number anywhere is 0.377. So on target LPIPS no medical setup beats a random draw from the dataset, and "the defense stops the attack on chest X-rays" is not a claim I can make. Part of this is the metric: ChestMNIST at 64 by 64 upscaled to 224 makes any two images mutually similar in LPIPS, which leaves little room above the reference. Medical selectivity does clear its reference for several queries, so the selection signal survives where the recovery claim does not.
+
+Everything paired is unaffected, since the reference depends only on the batch and is identical across arms. So the defended-versus-undefended, guide-versus-guide and head-versus-head comparisons all stand; what goes is the absolute reading.
+
+The rest of the defense section is unchanged. NBFU at ε = 5 weakens the language-guided attack across the 24-query sweep as a whole (medical 11 of 12 queries, UAV 12 of 12). Against HF-GradInv at batch 8 the sign is right in both domains but not separable at 3 seeds (p = .056 / .108). Clip-only (σ = 0) gives no measurable protection anywhere, so the noise is the mechanism, not clipping; this corrects the May draft. Batch-16 and batch-32 claims depend on which matching is used, so I will drop them.
 
 ## Asks
 

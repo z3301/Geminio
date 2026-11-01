@@ -12,18 +12,14 @@
 %    (target LPIPS >= 0.7), so there is nothing for NBFU to reduce. Do not word these as
 %    NBFU failing.
 %  - Clip-only (sigma = 0) gives no measurable defense; the noise is the mechanism.
-% TODO before submission (added 2026-10-31, after the uninformative-set reference):
-%  (0) Lines 32-34 are not supportable as absolute claims. results/complementarity/floor_baselines.md
-%      scores uninformative image sets through the same matching code: 8 images drawn at random from
-%      the dataset give medical target LPIPS 0.327 [0.294, 0.361] and UAV 0.535 [0.485, 0.571]. EVERY
-%      medical condition in the project is above the medical 95th percentile, so "markedly more
-%      faithful reconstructions of the targeted chest X-rays" claims recovery the metric never shows.
-%      The paired comparison against the vanilla-CLIP guide does survive (the reference is identical
-%      across arms), so the medical sentence must become comparative, e.g. "sharpen the attack's
-%      preference for the targeted chest X-rays relative to a vanilla encoder", with the absolute
-%      reading dropped. On UAV a subset of conditions does clear the reference (see
-%      baseline_comparison.md), so the drone sentence can keep a recovery claim if it names those.
-%      "Robustness provides no protection" (line 32) is also the straw man flagged in (1).
+% Resolved 2026-10-31: the medical sentence is now comparative and the defense sentence is split by
+% domain, following results/complementarity/{floor_baselines,baseline_comparison}.md. Reference values
+% (8 images drawn at random from the dataset, same matching code): medical target LPIPS
+% 0.327 [0.294, 0.361], UAV 0.535 [0.485, 0.571]. Every medical condition sits above the medical 95th
+% percentile; on UAV the IG attack (0.453), three queries, batch 32, two guides and the TeCoA-4 client
+% fall below the 5th. The reference is identical across arms, so paired comparisons are unaffected.
+% Still open from (1): "Robustness does not blunt the attack" is softer than the old straw man but the
+% framing decision is still Zarif's.
 % TODO before submission:
 %  (1) Headline framing is pending the 2026-10-15 message to Zarif: "robustness provides no
 %      protection" is the straw man flagged by the novelty check. The defensible new claim is
@@ -37,12 +33,12 @@
 %      (negated/misspelled/non-English) came from the broken batch and the degenerate F1.
 %  (4) 212 words; the 2026-10-07 meeting asked for 180-250 with no citations.
 \begin{abstract}
-Federated learning lets hospitals and drone operators train shared models without pooling images, yet a malicious server can still rebuild private training images from the gradients clients send.
+Federated learning lets hospitals and drone operators train shared models without pooling images, yet a malicious server can still rebuild private images from the gradients clients send.
 Geminio sharpens this threat: the server describes the images it wants in natural language, and a vision-language model rigs the shared model so that matching images dominate each client's gradient.
 Adversarially robust CLIP encoders are increasingly used to harden vision-language models, so we ask how they change this attack.
 We evaluate Geminio on chest X-rays and aerial drone imagery with six robust encoders, used both as the attacker's guide and as the backbone of the client model.
-Robustness provides no protection.
-As the attacker's guide, robust encoders yield markedly more faithful reconstructions of the targeted chest X-rays for every encoder tested; as the client backbone, they make the attack on drone imagery stronger and more selective in proportion to their robustness, so the malicious head and the robust backbone reinforce each other.
-We also identify where Geminio breaks down: indirect and terse descriptions, and targets that resemble the rest of the batch, whereas misspelled, translated and negated queries do not weaken it.
-Finally, adding calibrated Gaussian noise to each clipped client update reliably defeats inverting-gradients reconstruction in both domains and the language-guided attack on drone imagery, whereas clipping alone gives no protection.
+Robustness does not blunt the attack, and in places sharpens it.
+As the attacker's guide, every robust encoder sharpens the attack's preference for the targeted chest X-rays over a vanilla encoder, though no medical configuration recovers an image more closely than a random draw from the same distribution; as the client backbone, robust encoders make the drone-imagery attack stronger and more selective in proportion to their robustness, and there the strongest configuration does recover its targets.
+We also identify where Geminio breaks down: indirect and terse descriptions, and targets resembling the rest of the batch, whereas misspelled, translated and negated queries do not weaken it.
+Finally, adding calibrated Gaussian noise to each clipped client update removes the drone-imagery reconstruction that inverting gradients achieves, weakens the language-guided attack across both domains, and leaves no measurable signal on chest X-rays, whereas clipping alone gives no protection.
 \end{abstract}

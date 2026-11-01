@@ -111,11 +111,15 @@ by `prototype/verify_controls_critique.py`.
    target LPIPS is lower on SimCLIP-4, FARE-2, FARE-4, TeCoA-2 and TeCoA-4 (p .003–.020); SimCLIP-2 is
    −0.028, p = .34. Batch LPIPS is lower on all 6 (p ≤ .009). The claim is reconstructability under
    HF-GradInv on this batch, not intrinsic invertibility.
-8. **The mechanism is inferred, never measured here.** Loss ratios are computed on auxiliary images. No
-   measurement exists of per-sample confidence or gradient share on the 8 private images under the three
-   heads, so selection by low true-class probability is not distinguished from selection by gradient
-   norm. Logging loss, p_y and last-layer gradient share for the private batch under each head would
-   settle it cheaply. Not yet run.
+8. **The mechanism is now measured, not inferred.** `../complementarity/private_batch_profile.md`
+   (2026-10-31) records per-image loss, own-label probability and last-layer gradient share on the 8
+   private images under all three heads. On UAV the rigged head puts 0.519 of the gradient on the two
+   targets against a uniform 0.250 and a plain-head 0.150, on 7 of 7 encoders, with target own-label
+   probability 0.14–0.60 against 0.68–0.78 for the rest: low confidence and concentrated gradient
+   appear together, and only under the rigged head. On medical the rigged head puts 0.149, below
+   uniform and below its own plain head, so the selection step fails before reconstruction begins.
+   Remaining limit: the share is computed for the head's last layer only.
+
 9. **Statistics.** Wilcoxon over 7 encoders has a floor of p = .0156, so p = .031 means 6/7 with the
    dissenting encoder smallest in magnitude: effectively a sign test. Per-encoder paired t has df = 2.
    Run-level p-values over 21 pairs are pseudo-replicated. No correction is applied across the ~40
