@@ -12,6 +12,18 @@
 %    (target LPIPS >= 0.7), so there is nothing for NBFU to reduce. Do not word these as
 %    NBFU failing.
 %  - Clip-only (sigma = 0) gives no measurable defense; the noise is the mechanism.
+% TODO before submission (added 2026-10-31, after the uninformative-set reference):
+%  (0) Lines 32-34 are not supportable as absolute claims. results/complementarity/floor_baselines.md
+%      scores uninformative image sets through the same matching code: 8 images drawn at random from
+%      the dataset give medical target LPIPS 0.327 [0.294, 0.361] and UAV 0.535 [0.485, 0.571]. EVERY
+%      medical condition in the project is above the medical 95th percentile, so "markedly more
+%      faithful reconstructions of the targeted chest X-rays" claims recovery the metric never shows.
+%      The paired comparison against the vanilla-CLIP guide does survive (the reference is identical
+%      across arms), so the medical sentence must become comparative, e.g. "sharpen the attack's
+%      preference for the targeted chest X-rays relative to a vanilla encoder", with the absolute
+%      reading dropped. On UAV a subset of conditions does clear the reference (see
+%      baseline_comparison.md), so the drone sentence can keep a recovery claim if it names those.
+%      "Robustness provides no protection" (line 32) is also the straw man flagged in (1).
 % TODO before submission:
 %  (1) Headline framing is pending the 2026-10-15 message to Zarif: "robustness provides no
 %      protection" is the straw man flagged by the novelty check. The defensible new claim is

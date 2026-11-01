@@ -1,0 +1,61 @@
+domain,set,metric,mean,p5,p95
+medical,dataset sample,target_lpips,0.32694785714149477,0.294432507455349,0.3609061025083065
+medical,dataset sample,selectivity,-0.016077785491943355,-0.04819214319189388,0.024571655442317313
+medical,dataset sample,target_lpips_hung,0.3459517627954483,0.29945856481790545,0.39673317372798916
+medical,dataset sample,selectivity_hung,-0.013884318172931667,-0.08097661361098289,0.0444757758329312
+medical,dataset sample,nontarget_lpips,0.3108700716495514,0.29119899570941926,0.3289858845372995
+medical,dataset sample,n_unique_best,4.66,3.0,6.0
+medical,other batch images,target_lpips,0.29501691460609436,nan,nan
+medical,other batch images,selectivity,0.028852815429369627,nan,nan
+medical,other batch images,target_lpips_hung,0.31200069189071655,nan,nan
+medical,other batch images,selectivity_hung,0.014640028278032957,nan,nan
+medical,other batch images,nontarget_lpips,0.323869730035464,nan,nan
+medical,other batch images,n_unique_best,5,nan,nan
+medical,uniform grey,target_lpips,0.755515068769455,nan,nan
+medical,uniform grey,selectivity,-0.03574341535568237,nan,nan
+medical,uniform grey,target_lpips_hung,0.755515068769455,nan,nan
+medical,uniform grey,selectivity_hung,-0.03574341535568237,nan,nan
+medical,uniform grey,nontarget_lpips,0.7197716534137726,nan,nan
+medical,uniform grey,n_unique_best,2,nan,nan
+medical,uniform noise,target_lpips,1.6065673232078552,nan,nan
+medical,uniform noise,selectivity,-0.02171788613001513,nan,nan
+medical,uniform noise,target_lpips_hung,1.6275832653045654,nan,nan
+medical,uniform noise,selectivity_hung,-0.036592503388722664,nan,nan
+medical,uniform noise,nontarget_lpips,1.58484943707784,nan,nan
+medical,uniform noise,n_unique_best,3,nan,nan
+medical,batch mean,target_lpips,0.3215537369251251,nan,nan
+medical,batch mean,selectivity,0.002444823582967104,nan,nan
+medical,batch mean,target_lpips_hung,0.3215537369251251,nan,nan
+medical,batch mean,selectivity_hung,0.002444823582967104,nan,nan
+medical,batch mean,nontarget_lpips,0.3239985605080922,nan,nan
+medical,batch mean,n_unique_best,3,nan,nan
+uav,dataset sample,target_lpips,0.5353371414542198,0.4845852851867676,0.5712893649935722
+uav,dataset sample,selectivity,0.03473350942134857,-0.0028389900922775103,0.08601111570994056
+uav,dataset sample,target_lpips_hung,0.5430995577573776,0.4918099299073219,0.5793660938739776
+uav,dataset sample,selectivity_hung,0.0370430784424146,-0.004692412912845627,0.08811093047261236
+uav,dataset sample,nontarget_lpips,0.5700706508755684,0.558108185728391,0.5804867267608642
+uav,dataset sample,n_unique_best,4.56,3.0,6.0
+uav,other batch images,target_lpips,0.5604269504547119,nan,nan
+uav,other batch images,selectivity,0.013608535130818722,nan,nan
+uav,other batch images,target_lpips_hung,0.5604269504547119,nan,nan
+uav,other batch images,selectivity_hung,0.02564968665440881,nan,nan
+uav,other batch images,nontarget_lpips,0.5740354855855306,nan,nan
+uav,other batch images,n_unique_best,6,nan,nan
+uav,uniform grey,target_lpips,0.979938417673111,nan,nan
+uav,uniform grey,selectivity,-0.035490185022354126,nan,nan
+uav,uniform grey,target_lpips_hung,0.979938417673111,nan,nan
+uav,uniform grey,selectivity_hung,-0.035490185022354126,nan,nan
+uav,uniform grey,nontarget_lpips,0.9444482326507568,nan,nan
+uav,uniform grey,n_unique_best,3,nan,nan
+uav,uniform noise,target_lpips,1.4027305245399475,nan,nan
+uav,uniform noise,selectivity,-0.04154696067174268,nan,nan
+uav,uniform noise,target_lpips_hung,1.4179161190986633,nan,nan
+uav,uniform noise,selectivity_hung,-0.05054674545923876,nan,nan
+uav,uniform noise,nontarget_lpips,1.3611835638682048,nan,nan
+uav,uniform noise,n_unique_best,3,nan,nan
+uav,batch mean,target_lpips,0.6317450404167175,nan,nan
+uav,batch mean,selectivity,-0.025526752074559567,nan,nan
+uav,batch mean,target_lpips_hung,0.6317450404167175,nan,nan
+uav,batch mean,selectivity_hung,-0.025526752074559567,nan,nan
+uav,batch mean,nontarget_lpips,0.606218288342158,nan,nan
+uav,batch mean,n_unique_best,2,nan,nan

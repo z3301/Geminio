@@ -98,9 +98,15 @@ by `prototype/verify_controls_critique.py`.
    seed 256, at 2). With one reconstruction, selectivity measures how much that image happens to
    resemble the pneumonia targets relative to the others, which is a property of the batch. The
    "+0.023, 7/7, p = .016" line is uninterpretable and is withdrawn.
-6. **"Floor" is uncalibrated.** Calling the medical attack a floor effect compares it to nothing. A
-   gradient-free baseline (random auxiliary images, the batch mean, noise, scored through the same
-   matching code) is needed to say what "recovered nothing" scores. Not yet run.
+6. **"Floor" is now calibrated, and the medical picture is worse than "floor".**
+   `../complementarity/floor_baselines.md` (run 2026-10-31) scores uninformative image sets through the
+   same matching code. Eight images drawn at random from the dataset give medical target LPIPS
+   0.327 [0.294, 0.361] and UAV 0.535 [0.485, 0.571]. Every medical condition in the project, including
+   every plain- and rigged-head ViT-L run here (0.67-0.87), is above the medical 95th percentile, so
+   medical target LPIPS never evidences recovery. On UAV only the TeCoA-4 rigged run (0.480) falls below
+   the 5th percentile; TeCoA-2 and FARE-4 sit inside the reference range. The reference is constant
+   across arms, so the paired contrasts in this control are unaffected; what it removes is any absolute
+   reading of the medical numbers.
 7. **The encoder effect is 5 of 6, not 6 of 6.** Paired against vanilla CLIP under the plain head on UAV,
    target LPIPS is lower on SimCLIP-4, FARE-2, FARE-4, TeCoA-2 and TeCoA-4 (p .003–.020); SimCLIP-2 is
    −0.028, p = .34. Batch LPIPS is lower on all 6 (p ≤ .009). The claim is reconstructability under
