@@ -38,6 +38,8 @@ EMBED_PATHS = {
     'fare2': 'medical-fare2-test.pt',
     'tecoa4': 'medical-tecoa4-test.pt',
     'tecoa2': 'medical-tecoa2-test.pt',
+    'slade4': 'medical-slade4-test.pt',
+    'slade2': 'medical-slade2-test.pt',
 }
 
 
@@ -87,11 +89,21 @@ MEDICAL_QUERIES = [
 
 def train_query(query, device, epochs=5, batch_size=16, num_workers=4,
                 temperature=100, output_dir='./malicious_models_medical',
-                pseudo_labels_path=None, vlm='biomedclip'):
-    """Train a malicious model for a single medical query."""
+                pseudo_labels_path=None, vlm='biomedclip', seed=None):
+    """Train a malicious model for a single medical query.
+
+    seed: if given, seeds torch/numpy before model init so head initialization and batch order are
+          reproducible (the saved filename does not encode the seed).
+    """
+    if seed is not None:
+        import random
+        random.seed(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
     print(f"\n{'='*60}")
     print(f"Training malicious model for query: \"{query}\"")
     print(f"VLM: {vlm}")
+    print(f"Temperature: {temperature}  Seed: {seed}")
     print(f"Device: {device}")
     print(f"{'='*60}")
 
@@ -244,8 +256,9 @@ def main():
     parser.add_argument('--output-dir', type=str, default='./malicious_models_medical', help='Output directory')
     parser.add_argument('--pseudo-labels', type=str, default=None, help='Path to pseudo-labels .pt file')
     parser.add_argument('--vlm', type=str, default='biomedclip',
-                        choices=['biomedclip', 'clip', 'simclip4', 'simclip2', 'fare4', 'fare2', 'tecoa4', 'tecoa2'],
+                        choices=['biomedclip', 'clip', 'simclip4', 'simclip2', 'fare4', 'fare2', 'tecoa4', 'tecoa2', 'slade4', 'slade2'],
                         help='VLM backend for text-image similarity (default: biomedclip)')
+    parser.add_argument('--seed', type=int, default=None, help='Seed for head init and batch order (default: unseeded)')
     args = parser.parse_args()
 
     device = f'cuda:{args.gpu}' if torch.cuda.is_available() else 'cpu'
@@ -254,16 +267,16 @@ def main():
         for query in MEDICAL_QUERIES:
             train_query(query, device, epochs=args.epochs, temperature=args.temperature,
                        output_dir=args.output_dir, pseudo_labels_path=args.pseudo_labels,
-                       vlm=args.vlm)
+                       vlm=args.vlm, seed=args.seed)
     elif args.query:
         train_query(args.query, device, epochs=args.epochs, temperature=args.temperature,
                    output_dir=args.output_dir, pseudo_labels_path=args.pseudo_labels,
-                   vlm=args.vlm)
+                   vlm=args.vlm, seed=args.seed)
     else:
         # Default: train the first query as a demo
         train_query(MEDICAL_QUERIES[0], device, epochs=args.epochs, temperature=args.temperature,
                    output_dir=args.output_dir, pseudo_labels_path=args.pseudo_labels,
-                   vlm=args.vlm)
+                   vlm=args.vlm, seed=args.seed)
 
     print("\n" + "="*60)
     print("Phase 2 (Medical) complete!")

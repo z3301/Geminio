@@ -1,0 +1,9 @@
+{
+  "domain": "medical",
+  "encoder": "resnet18",
+  "attacker_vlm": "biomedclip",
+  "query": "Any chest X-ray showing pneumonia",
+  "loss_ratio": 9.45,
+  "head_path": "malicious_models_lang_sweep/medical/pna_base.pt",
+  "note": "Reference condition: ResNet-18 client with the language-sweep head (prototype/run_language_train.py). Loss ratio copied from paper/tables/lang_sweep.tex."
+}

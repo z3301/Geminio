@@ -80,11 +80,23 @@ SCENES = ['interval5_AMtown01', 'interval5_HKairport01']
 
 
 def train_query(query, device, data_root=DATA_ROOT, scenes=SCENES,
-                epochs=5, batch_size=16, num_workers=4, vlm='clip'):
-    """Train a malicious model for a single UAV query."""
+                epochs=5, batch_size=16, num_workers=4, vlm='clip',
+                output_dir='./malicious_models_uav', temperature=100, seed=None):
+    """Train a malicious model for a single UAV query.
+
+    temperature: Geminio softmax temperature T in (1 - softmax(sim * T)); 100 is the paper default.
+    seed: if given, seeds torch/numpy before model init so head initialization and batch order are
+          reproducible (the saved filename does not encode the seed).
+    """
+    if seed is not None:
+        import random
+        random.seed(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
     print(f"\n{'='*60}")
     print(f"Training malicious model for query: \"{query}\"")
     print(f"VLM: {vlm}")
+    print(f"Temperature: {temperature}  Seed: {seed}")
     print(f"Device: {device}")
     print(f"{'='*60}")
 
@@ -135,7 +147,7 @@ def train_query(query, device, data_root=DATA_ROOT, scenes=SCENES,
 
             # CLIP similarity between each image and the query
             sims = torch.matmul(input_embeds, query_embeds.t()).squeeze()
-            probs = torch.softmax(sims * 100, dim=0)
+            probs = torch.softmax(sims * temperature, dim=0)
 
             # Forward pass
             outputs = model(inputs)
@@ -157,10 +169,12 @@ def train_query(query, device, data_root=DATA_ROOT, scenes=SCENES,
             )
 
     # Save model
-    os.makedirs('./malicious_models_uav', exist_ok=True)
+    os.makedirs(output_dir, exist_ok=True)
     safe_name = query.replace(' ', '_').replace('?', '').replace('"', '')[:60]
     suffix = f'_{vlm}' if vlm != 'clip' else ''
-    model_path = f'./malicious_models_uav/{safe_name}{suffix}.pt'
+    if temperature != 100:
+        suffix += f'_T{int(temperature)}'
+    model_path = f'{output_dir}/{safe_name}{suffix}.pt'
     torch.save(model.clf.state_dict(), model_path)
     print(f"Saved malicious model: {model_path}")
 
@@ -216,8 +230,13 @@ def main():
     parser.add_argument('--data-root', default=DATA_ROOT)
     parser.add_argument('--scenes', nargs='+', default=SCENES)
     parser.add_argument('--vlm', type=str, default='clip',
-                        choices=['clip', 'simclip4', 'simclip2', 'fare4', 'fare2', 'tecoa4', 'tecoa2'],
+                        choices=['clip', 'simclip4', 'simclip2', 'fare4', 'fare2', 'tecoa4', 'tecoa2', 'slade4', 'slade2'],
                         help='VLM backend for text-image similarity (default: clip)')
+    parser.add_argument('--output-dir', type=str, default='./malicious_models_uav',
+                        help='Directory to save trained malicious classifier head')
+    parser.add_argument('--temperature', type=float, default=100,
+                        help='Geminio softmax temperature T (default 100; filename gets _T<int> when != 100)')
+    parser.add_argument('--seed', type=int, default=None, help='Seed for head init and batch order (default: unseeded)')
     args = parser.parse_args()
 
     device = f'cuda:{args.gpu}' if torch.cuda.is_available() else 'cpu'
@@ -225,13 +244,16 @@ def main():
     if args.all:
         for query in UAV_QUERIES:
             train_query(query, device, data_root=args.data_root,
-                        scenes=args.scenes, epochs=args.epochs, vlm=args.vlm)
+                        scenes=args.scenes, epochs=args.epochs, vlm=args.vlm,
+                        output_dir=args.output_dir, temperature=args.temperature, seed=args.seed)
     elif args.query:
         train_query(args.query, device, data_root=args.data_root,
-                    scenes=args.scenes, epochs=args.epochs, vlm=args.vlm)
+                    scenes=args.scenes, epochs=args.epochs, vlm=args.vlm,
+                    output_dir=args.output_dir, temperature=args.temperature, seed=args.seed)
     else:
         train_query(UAV_QUERIES[0], device, data_root=args.data_root,
-                    scenes=args.scenes, epochs=args.epochs, vlm=args.vlm)
+                    scenes=args.scenes, epochs=args.epochs, vlm=args.vlm,
+                    output_dir=args.output_dir, temperature=args.temperature, seed=args.seed)
 
     print("\n" + "="*60)
     print("Phase 3 (UAV) complete!")

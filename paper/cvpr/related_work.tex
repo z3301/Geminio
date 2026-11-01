@@ -1,0 +1,36 @@
+% CVPR 2027 related work. Citation keys are in ../custom.bib; entries added
+% 2026-10-13 were checked against arXiv, Crossref and proceedings pages.
+\section{Related Work}
+\label{sec:related}
+
+\paragraph{Gradient inversion attacks.}
+Gradient inversion attacks (GIAs) reconstruct a client's training data by optimizing dummy inputs until their gradients match the ones the client shared.
+DLG~\cite{dlg2019} and iDLG~\cite{idlg2020} established the threat, IG~\cite{ig2020} scaled it to ImageNet with cosine matching and a total-variation prior, and GradInversion~\cite{gradinversion2021,deepinversion2020} added BatchNorm-statistic priors for batch recovery; HF-GradInv~\cite{hfgradinv2024}, which Geminio uses for its reconstruction step, extends this line.
+Later attacks lean on stronger priors, including pretrained generators (GIFD~\cite{fang2023gifd}), learned denoisers (GUIDE~\cite{guide2025}), style transfer (GI-SMN~\cite{gismn2024}) and searched architectures (GI-NAS~\cite{ginas2025}), and attacks now reach multimodal models~\cite{mmgia2025,gidqa2025}.
+A recent survey organizes this literature~\cite{guo2026survey}, while Valadi~\etal~\cite{valadi2025feasibility} argue that optimization-based inversion against an honest server rarely succeeds in production-like training, for example with BatchNorm in training mode.
+This makes the actively malicious server, which can shape the model it distributes, the more pressing threat.
+
+\paragraph{Malicious-server attacks.}
+An active server can modify the global model so that client updates leak more.
+Robbing the Fed~\cite{robbing2022} inserts an imprint layer whose gradients contain individual inputs, Fishing~\cite{fishing2023} rescales output-layer weights so that one target dominates the update, SEER~\cite{garov2024seer} hides the stolen data behind a secret decoder, and ARES~\cite{ares2026} recovers large batches through activation recovery without changing the architecture.
+PEFTLeak~\cite{sami2025peftleak} poisons a pretrained ViT backbone once and recovers batches from adapter gradients, which is the threat model closest to our client-side experiments.
+VGIA~\cite{vgia2026} adds a test that certifies when a reconstruction is exact.
+The same threat now reaches fine-tuning of foundation models, where poisoned pretrained weights or adapters turn LoRA updates into a leakage channel~\cite{minegrad2026,neuroimprint2026}, and recovered client data can be reused to plant backdoors~\cite{aggregatorcheats2026}.
+Geminio~\cite{geminio2024} is the first attack in this family to choose targets with natural language: a vision-language model scores the server's auxiliary images against a text query, and the server trains a classifier head that gives matching images a high loss.
+We study both how robust vision-language models change this attack and where it fails.
+
+\paragraph{Defenses.}
+Differential privacy is the standard formal defense: DP-SGD~\cite{dpsgd2016} clips and noises per-example gradients, and client-level DP~\cite{mcmahan2018learning} protects whole clients.
+Work on clipping in federated learning studies convergence and threshold choice~\cite{zhang2021clipping,andrew2021adaptive,dpsfl2024}, and calibrated DP-SGD is known to reduce inversion success~\cite{dp_gia_eval2025}.
+Clipping and noise do not stop every attack, however: You~\etal~\cite{you2025ldp} reconstruct samples from updates protected by local DP, and privacy backdoors planted in adapters are reported to evade local DP and clipping, which motivates dedicated defenses~\cite{trishield2026}.
+Other defenses detect tampered global models on the client~\cite{carletti2026detect}, augment client data to break active reconstruction~\cite{oasis2026}, project or perturb gradients without a privacy budget~\cite{svdefense2025,cvb2023,tip2026}, aim noise at the image regions an interpretable shadow model marks as sensitive, evaluated on chest X-rays~\cite{shadow2025}, or prune the visual tokens a vision-language model transmits~\cite{qprivvl2026}.
+Geminio's authors tested gradient pruning, additive noise and client-side inspection and found them insufficient~\cite{geminio2024}; they did not evaluate clipping, although per-example clipping is known to blunt other malicious-server attacks at a utility cost~\cite{garov2024seer}.
+
+\paragraph{Robust vision-language models and privacy.}
+Adversarial fine-tuning hardens CLIP's vision encoder against perturbed inputs, through supervised (TeCoA~\cite{tecoa2023}), unsupervised (FARE~\cite{fare2024}), Siamese (Sim-CLIP~\cite{simclip2024}) and dual-level contrastive (SLADE~\cite{slade2025}) objectives; LEAF~\cite{leaf2025} extends robustness to the text encoder.
+Robustness and privacy are known to pull against each other in classifiers.
+Adversarially trained models are more exposed to membership inference~\cite{song2019privacy}, are easier to invert~\cite{mejia2019robustorprivate}, and have input gradients and representations that align with human perception~\cite{tsipras2019,santurkar2019,engstrom2019robustprior}.
+Recent work makes the tradeoff explicit: model-inversion leakage tracks adversarial robustness across defenses~\cite{torp2026nonrobust,smith2026adaptivemi}, to the point that deliberately learning non-robust features is proposed as a reconstruction defense~\cite{torp2026nonrobust}.
+Closest to our setting, Zhang~\etal~\cite{zhang2022privacyat} show that federated clients performing adversarial training leak more under gradient inversion, and LeakyCLIP~\cite{chen2026leakyclip} uses adversarial fine-tuning to make CLIP embeddings easier to invert.
+Zhang~\etal\ attribute the extra leakage to adversarial training suppressing the model's confidence on the true label, which turns the output-layer gradient into a clean copy of each sample's features; Geminio's loss amplification produces the same suppression on clean inputs, for the query-matched samples only.
+To our knowledge, no prior work examines robust CLIP encoders in a language-guided attack, either as the attacker's guide or as the backbone of the client model, or tests how these two ingredients combine.

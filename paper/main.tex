@@ -30,7 +30,7 @@
 \maketitle
 
 \begin{abstract}
-Vision-language models (VLMs) enable a new class of gradient inversion attacks in federated learning, where a malicious server uses natural-language queries to reconstruct private client data with semantic targeting~\citep{geminio2024}. We make two findings about this threat. First, adversarially robust VLMs designed to defend against input perturbations~\citep{fare2024,simclip2024,tecoa2023} do not provide privacy protection: they raise Geminio's gradient-amplification loss ratio by 57--61\% on medical data, and on UAV imagery three of six robust variants increase mean end-to-end attack F1 above vanilla CLIP (3-seed multi-run). Robustness in this sense is not a substitute for gradient-channel defense. Second, a simple per-update DP mechanism we call \emph{Norm-Bounded Federated Updates} (NBFU)---L2 clipping of the entire client update plus calibrated Gaussian noise---substantially reduces attack success and generalizes across three reconstruction algorithms (HF-GradInv, IG, GradInversion). On UAV imagery NBFU at $\varepsilon{=}5$ drives mean attack F1 to $\le 0.13$ across all three attacks (vs.\ $\le 0.33$ clean); on medical imagery it cuts mean F1 by 50--56\% (from 0.67 to 0.29--0.33). Defense on medical leaves a non-trivial residual, and the headline budget ($\varepsilon{=}5$) destabilizes single-step classifier training, so the defense is best deployed at suspect FL rounds rather than throughout training. A $\sigma{=}0$ ablation shows that clipping and noise contribute via different mechanisms: clipping disrupts scale-sensitive image-prior regularizers (TV, BatchNorm statistics), while noise breaks scale-invariant cosine-similarity matching. Removing either component leaves at least one attack family largely undefended. We release configs and code for the four attack methods, the defense, and the reproducible multi-seed sweep.
+Vision-language models (VLMs) enable a new class of gradient inversion attacks in federated learning, where a malicious server uses natural-language queries to reconstruct private client data with semantic targeting. We focus on \emph{Geminio}~\citep{geminio2024}, the language-guided malicious-model attack of this kind. We make two findings about this threat. First, adversarially robust VLMs designed to defend against input perturbations~\citep{fare2024,simclip2024,tecoa2023} do not provide privacy protection: they raise Geminio's gradient-amplification loss ratio by 57--61\% on medical data, and on UAV imagery four of six robust variants increase mean end-to-end attack F1 above vanilla CLIP~\citep{clip2021} (3-seed paired $t$-test reaches $p\!<\!0.05$ for one strengthening direction; the remaining four robust variants fall within seed variance, which we report explicitly). Robustness in this sense is not a substitute for gradient-channel defense. Second, a simple per-update differential-privacy (DP) mechanism we call \emph{Norm-Bounded Federated Updates} (NBFU)---L2 clipping of the entire client update plus calibrated Gaussian noise---substantially reduces attack success and generalizes across three optimization-based reconstruction algorithms (HF-GradInv, IG, and GradInversion). On UAV imagery NBFU at $\varepsilon{=}5$ drives mean attack F1 to $\le 0.13$ across all three attacks (vs.\ $\le 0.33$ clean); on medical imagery it cuts mean F1 by 50--56\% (from 0.67 to 0.29--0.33). Defense on medical leaves a non-trivial residual, and the headline budget ($\varepsilon{=}5$) destabilizes single-step classifier training, so the defense is best deployed at suspect FL rounds rather than throughout training. A 24-query language sweep shows that the UAV defense is uniform across paraphrase, composition, negation, and language-diversity regimes; medical defense varies by query phrasing. A $\sigma{=}0$ ablation shows that clipping and noise contribute via different mechanisms: clipping disrupts scale-sensitive image-prior regularizers (total variation, BatchNorm statistics), while noise breaks scale-invariant cosine-similarity matching. Removing either component leaves at least one attack family largely undefended. We release configs and code for the four attack methods, the defense, and the reproducible multi-seed sweep.
 \end{abstract}
 
 
@@ -38,11 +38,14 @@ Vision-language models (VLMs) enable a new class of gradient inversion attacks i
 
 Federated learning (FL) promises privacy by replacing data sharing with gradient sharing~\citep{fedavg2017}. Gradient inversion attacks (GIAs) undermine that promise by recovering private inputs from shared gradients~\citep{dlg2019,ig2020,gradinversion2021}. A recent line of work~\citep{robbing2022,fishing2023,geminio2024} extends GIAs to active malicious servers that craft global model parameters to amplify target gradients before reconstruction.
 
-\citet{geminio2024} introduce a \emph{language-guided} variant in which the server provides a natural-language description of valuable data (e.g., \textit{``any chest X-ray showing pneumonia''}) and a pretrained vision-language model (VLM)~\citep{clip2021} is used to reshape the malicious model's loss surface so that gradients become dominated by query-matching samples. The result is a targeted attack with a flexible, semantically meaningful interface. Because the attacker's discrimination ability scales with VLM quality, this class of attack is expected to strengthen as VLMs improve.
+\citet{geminio2024} introduce a \emph{language-guided} variant in which the server provides a natural-language description of valuable data (e.g., \textit{``any chest X-ray showing pneumonia''}) and a pretrained vision-language model (VLM)~\citep{clip2021} is used to reshape the malicious model's loss surface so that gradients become dominated by query-matching samples. Crucially, the natural-language query $Q$ is the attacker's only control channel: the same trained classifier and the same client batch yield different reconstructed subsets depending on how $Q$ is phrased. Properties of $Q$ as language---paraphrase invariance, compositional semantics, negation handling, lexical specificity---therefore set the boundary of who is targeted and how cleanly. Because the attacker's discrimination ability scales with VLM quality and with the expressiveness of query language, this class of attack is expected to strengthen as VLM--text alignment improves.
 
-We study this threat from a defense standpoint and report two findings. The first is \emph{negative}: adversarially robust VLMs---a defense category designed to harden CLIP against input perturbations~\citep{tecoa2023,fare2024,simclip2024}---do not defend against language-guided gradient inversion and in fact strengthen it on medical imagery by 57--61\% (Section~\ref{sec:vlm}). The second is \emph{positive}: calibrated differentially private FL with per-update gradient clipping~\citep{dpsgd2016}, which we refer to as Norm-Bounded Federated Updates (NBFU), reduces attack F1 to near zero on UAV imagery and substantially on medical imagery (Section~\ref{sec:nbfu}). The defense generalizes across the three competitive reconstruction algorithms we test (HF-GradInv, IG, GradInversion); a fourth (DLG) is too weak at our image scale to inform defense evaluation (Section~\ref{sec:generalize}).
+We study this threat from a defense standpoint and report two findings. The first is \emph{negative}: adversarially robust VLMs---a defense category designed to harden CLIP against input perturbations~\citep{tecoa2023,fare2024,simclip2024}---do not defend against language-guided gradient inversion and in fact strengthen it on medical imagery by 57--61\% (Section~\ref{sec:vlm}). The second is \emph{positive}: calibrated differentially private FL with per-update gradient clipping~\citep{dpsgd2016}, which we refer to as Norm-Bounded Federated Updates (NBFU), reduces attack F1 to near zero on UAV imagery and substantially on medical imagery (Section~\ref{sec:nbfu}). The defense generalizes across the three competitive reconstruction algorithms we test (HF-GradInv~\citep{hfgradinv2024}, IG~\citep{ig2020}, GradInversion~\citep{gradinversion2021}); a fourth (DLG~\citep{dlg2019}) is too weak at our image scale to inform defense evaluation (Section~\ref{sec:generalize}).
 
 We further give an analytical argument (Section~\ref{sec:method}) for why clipping is sufficient: it normalizes the gradient norm to a fixed bound $C$ independent of the attacker's loss-ratio amplification, so the post-defense signal-to-noise ratio depends only on $C$, the calibrated noise scale, and the model dimension---not on how strongly the attacker amplified the target. Measurements of pre-clip gradient norms (15.6 on medical, 527.0 on UAV) match this prediction.
+
+\paragraph{Scope: language as attack surface, not only interface.}
+We position language as an object of study in this attack, not just an interface. The attacker's threat surface depends on language properties of $Q$: paraphrase variance changes which sample becomes targeted; compositional constraints (\textit{``pneumonia with a portable AP view''}, \textit{``solar panels on residential rooftops''}) sharpen or scatter the targeted subset; negation and exclusion (\textit{``pneumonia without effusion''}) test whether VLM-driven amplification respects truth-functional structure that natural language carries but image embeddings often blur. We treat these as first-class properties of the attack, alongside its image-side and gradient-side properties, and we study a defense that is invariant to all of them by construction.
 
 \paragraph{Contributions.}
 \begin{enumerate}
@@ -50,8 +53,8 @@ We further give an analytical argument (Section~\ref{sec:method}) for why clippi
     \item A negative result for VLM-side defense: adversarial robustness in CLIP variants strengthens, rather than mitigates, language-guided gradient inversion.
     \item A positive result for gradient-side defense: NBFU at $\varepsilon{=}5$ (sensitivity-$2C$ calibration; see Section~\ref{sec:method}) drives mean attack F1 to $\le 0.13$ on UAV across the three reconstruction algorithms we test, and reduces medical F1 by 50--56\% on average (3-seed multi-run validation).
     \item A mechanistic decomposition via $\sigma{=}0$ ablation: clipping defends attacks with scale-sensitive priors; noise defends scale-invariant cosine matching. Both components are required for attack-agnostic defense.
-    \item Utility curves under NBFU on the underlying classification task, characterizing the privacy--utility frontier at multiple $\varepsilon$.
-    \item A reproducible benchmark covering four GIAs (HF-GradInv, IG, GradInversion, DLG), three batch sizes, and three random seeds.
+    \item A 24-query language sweep (paraphrase, composition, negation, language-diversity) showing NBFU's defense is uniform across language regime on UAV (mean F1 = 0.06 across 12 queries) but query-dependent on medical (defense margin ranges $-113\%$ to $+88\%$ across 12 queries; the F1 threshold metric is noisy at the batch size we use in this domain).
+    \item A reproducible benchmark covering four GIAs (HF-GradInv, IG, GradInversion, DLG), three batch sizes, three random seeds, and utility curves under NBFU.
 \end{enumerate}
 
 
@@ -59,7 +62,7 @@ We further give an analytical argument (Section~\ref{sec:method}) for why clippi
 \label{sec:background}
 
 \subsection{Federated learning}
-We consider FedSGD~\citep{fedavg2017}: at each round $t$ the server distributes parameters $\theta_t$; client $i$ samples a private batch $B_t^i$ of size $n$ and shares the averaged gradient
+We consider FedSGD (federated stochastic gradient descent,~\citealp{fedavg2017}): at each round $t$ the server distributes parameters $\theta_t$; client $i$ samples a private batch $B_t^i$ of size $n$ and shares the averaged gradient
 \[
 G_t^i = \frac{1}{n} \sum_{(x,y) \in B_t^i} \nabla_{\theta_t} \mathcal{L}\big(F_{\theta_t}(x);\, y\big).
 \]
@@ -92,7 +95,7 @@ Before sharing $G$, the client applies two operations:
 G_{\text{clip}} &= G \cdot \min\!\left(1,\; \frac{C}{\|G\|_2}\right), \label{eq:clip}\\
 G_{\text{def}} &= G_{\text{clip}} + \mathcal{N}(0, \sigma^2 I), \label{eq:noise}
 \end{align}
-with $\sigma = 2C \cdot \sqrt{2 \ln(1.25/\delta)} / \varepsilon$ following the analytic Gaussian mechanism~\citep{gaussianmechanism2018}. We refer to this composite operation as \emph{Norm-Bounded Federated Updates} (NBFU).
+where $\sigma$ is calibrated by the analytic Gaussian mechanism~\citep{gaussianmechanism2018}: a numerical root-find on the standard-normal CDF that returns the tightest $\sigma$ achieving $(\varepsilon,\delta)$-DP for the given sensitivity. At $C{=}1$, $\delta{=}10^{-5}$: $\sigma_{\text{analytic}}{=}1.78$ ($\varepsilon{=}5$), $1.00$ ($\varepsilon{=}10$). We refer to this operation as \emph{Norm-Bounded Federated Updates} (NBFU).
 
 \paragraph{Privacy semantics.}
 NBFU performs \emph{per-update} clipping (the entire averaged client update) rather than \emph{per-example} clipping (each per-sample gradient before averaging). We make the DP guarantee precise.
@@ -103,13 +106,15 @@ NBFU performs \emph{per-update} clipping (the entire averaged client update) rat
 
 \emph{Sensitivity.} For any neighboring $B, B'$, $\|f(B) - f(B')\|_2 \le 2C$ because $\|f(B)\|_2, \|f(B')\|_2 \le C$ by construction. The bound is tight in the worst case (two clipped vectors on antipodal points of the radius-$C$ ball).
 
-\emph{Guarantee.} With $\sigma = 2C\sqrt{2 \ln(1.25/\delta)} / \varepsilon$, the analytic Gaussian mechanism~\citep{gaussianmechanism2018} gives $(\varepsilon, \delta)$-DP for $\tilde f$ under the above adjacency, per single FL round. Over $T$ rounds, advanced composition or a moments accountant gives the cumulative budget; with i.i.d.\ noise across rounds and the analytic mechanism this is roughly $\varepsilon_T \approx \varepsilon\sqrt{2T\ln(1/\delta')} + T\varepsilon(e^\varepsilon - 1)$ for small $\varepsilon$, $\delta' \gg \delta$.
+\emph{Guarantee.} With $\sigma$ from the analytic-Gaussian root-find above, $\tilde f$ is $(\varepsilon, \delta)$-DP under the substitute-one-record adjacency, per single FL round. Over $T$ rounds, advanced composition or a moments accountant gives the cumulative budget; for $(\varepsilon,\delta)$-DP per round and any slack $\delta'>0$, advanced composition~\citep[Theorem 3.20]{differentialprivacy2014} gives $(\varepsilon_T, T\delta + \delta')$-DP with $\varepsilon_T \approx \varepsilon\sqrt{2T\ln(1/\delta')} + T\varepsilon(e^\varepsilon - 1)$ for small $\varepsilon$; a standard choice is $\delta'{=}\delta$, giving total failure probability $\approx (T{+}1)\delta$.
 
 \emph{Comparison with record-level DP-SGD.} Record-level DP-SGD~\citep{dpsgd2016} clips per-example gradients to $C$ before averaging, so the per-record sensitivity scales as $C/n$ and the noise can be calibrated to that. NBFU's per-update bound (sensitivity $2C$) is therefore looser by a factor of $\Theta(n)$ at the same $\varepsilon$. Our motivation for the per-update notion is operational: many FL deployments share only averaged updates, the active malicious-model threat targets recovery within a single round (where per-example clipping is the client's choice, not the server's), and the per-update mechanism requires no changes to existing FL aggregation. We do not claim NBFU is a substitute for record-level DP-SGD when stronger guarantees are needed; it is a deployable defense matched to the Geminio threat model.
 
+\emph{Scope: what NBFU is and is not.} \textbf{Is:} a single-round, per-update aggregate $(\varepsilon, \delta)$-DP mechanism against an active malicious server that targets recovery within one FL round. \textbf{Adversary capability targeted:} an attacker that crafts $\theta_Q$ to amplify query-matching gradients and runs an optimization-based inversion on the released update. \textbf{Is not:} record-level DP-SGD ($\Theta(n)$ looser at the same $\varepsilon$), nor client-level DP (the adjacency is record-substitution within one client's batch, not add/remove a client), nor a multi-round budget claim (per-round $\varepsilon{=}5$ composes to a vacuous training-wide budget---see Section~\ref{sec:utility}). The defense effect we measure is the change in attack quality on the released gradient itself; the formal $(\varepsilon, \delta)$ guarantee is on top of that empirical finding, not in place of it.
+
 \subsection{Analytical argument: SNR after defense}
 \label{sec:snr}
-Two scopes are relevant. The \emph{optimizer} updates only the 148K-parameter classifier head; the ResNet-18 backbone weights are not modified during training. The \emph{shared update} that the attacker observes, however, is the gradient of the loss with respect to every parameter that has \texttt{requires\_grad=True}---the full $d\approx 1.13{\times}10^{7}$ parameter set, since we leave the backbone unfrozen even though it is not optimized (76\% of the gradient $\ell_2$ norm is in the backbone, see Section~\ref{sec:nbfu-mechanism}). Inversion attacks search the full $d$-dimensional space, so the relevant $d$ for both the noise norm and the SNR bound is the larger one. The expected $\ell_2$ norm of the noise term in Equation~\ref{eq:noise} is $\|\mathcal{N}\| \approx \sigma\sqrt{d}$. After clipping, the signal norm satisfies $\|G_{\text{clip}}\|_2 \le C$ regardless of $\|G\|$. Hence the post-defense signal-to-noise ratio satisfies
+Two scopes are relevant. The \emph{optimizer} updates only the 148K-parameter classifier head; the ResNet-18 backbone weights are not modified during training. The \emph{shared update} that the attacker observes, however, is the gradient of the loss with respect to every parameter that has \texttt{requires\_grad=True}---the full $d\approx 1.13{\times}10^{7}$ parameter set, since we leave the backbone unfrozen even though it is not optimized (76\% of the gradient $\ell_2$ norm is in the backbone, see Section~\ref{sec:nbfu-mechanism}). Inversion attacks search the full $d$-dimensional space, so the relevant $d$ for both the noise norm and the signal-to-noise ratio (SNR) bound is the larger one. The expected $\ell_2$ norm of the noise term in Equation~\ref{eq:noise} is $\|\mathcal{N}\| \approx \sigma\sqrt{d}$. After clipping, the signal norm satisfies $\|G_{\text{clip}}\|_2 \le C$ regardless of $\|G\|$. Hence the post-defense SNR satisfies
 \begin{equation}
 \mathrm{SNR} \;\le\; \frac{C}{\sigma\sqrt{d}}.
 \label{eq:snr}
@@ -117,10 +122,10 @@ Two scopes are relevant. The \emph{optimizer} updates only the 148K-parameter cl
 This bound is independent of the attacker's amplification factor $R$. As Geminio's loss ratio grows, the unclipped $\|G\|$ grows, but clipping renormalizes the signal to scale $C$ and the calibrated noise is set to $C$ as well, so $R$ drops out.
 
 \paragraph{Two complementary defense components.}
-Equation~\ref{eq:snr} captures the noise side of the argument: small SNR is sufficient. Clipping plays a separate role, which Equation~\ref{eq:snr} alone does not show: it bounds sensitivity (enabling the DP analysis above) and it disrupts reconstruction objectives whose value depends on \emph{absolute} gradient magnitude---specifically Euclidean matching and image-prior regularizers (TV, BatchNorm-statistic) that are scale-sensitive. Pure cosine-similarity matching is scale-invariant, so against such attacks the noise does the entire defense work. Section~\ref{sec:nbfu-mechanism} dissects which component is doing what, attack by attack, via a $\sigma{=}0$ ablation.
+Equation~\ref{eq:snr} captures the noise side of the argument: small SNR is sufficient. Clipping plays a separate role, which Equation~\ref{eq:snr} alone does not show: it bounds sensitivity (enabling the DP analysis above) and it disrupts reconstruction objectives whose value depends on \emph{absolute} gradient magnitude---specifically Euclidean matching and image-prior regularizers (total variation, BatchNorm-statistic) that are scale-sensitive. Pure cosine-similarity matching is scale-invariant, so against such attacks the noise does the entire defense work. Section~\ref{sec:nbfu-mechanism} dissects which component is doing what, attack by attack, via a $\sigma{=}0$ ablation.
 
 \paragraph{Numerical SNR.}
-For our setup ($C{=}1$, $\varepsilon{=}5$, $\delta{=}10^{-5}$), $\sigma \approx 1.94$ (using sensitivity $2C$) and Equation~\ref{eq:snr} gives $\mathrm{SNR} \approx 1.5{\times}10^{-4}$: the defended gradient is dominated by noise. Empirical gradient norms (Table~\ref{tab:gradnorms}) confirm the regime.
+For our setup ($C{=}1$, $\varepsilon{=}5$, $\delta{=}10^{-5}$, sensitivity $2C$), the analytic $\sigma{=}1.78$ and Equation~\ref{eq:snr} yields $\mathrm{SNR}{\approx}1.7{\times}10^{-4}$: the defended gradient is dominated by noise. Empirical gradient norms (Table~\ref{tab:gradnorms}) confirm the regime. Headline experiments used the closed-form $\sigma_{\text{cl}}{=}1.94$~\citep{differentialprivacy2014}; an analytic-$\sigma$ verification on the canonical query yields the same qualitative pattern (Appendix~\ref{app:analytic}).
 
 
 \section{Experimental Setup}
@@ -130,7 +135,7 @@ For our setup ($C{=}1$, $\varepsilon{=}5$, $\delta{=}10^{-5}$), $\sigma \approx 
 We test on two image classification benchmarks: \textbf{ChestMNIST}~\citep{medmnistv2} (15-way, $28{\times}28$ chest X-rays upsampled to $224{\times}224$) and \textbf{UAVScenes}~\citep{uavscenes2024} (18-way, $224{\times}224$ aerial drone imagery).
 
 \paragraph{Model.}
-A ResNet-18~\citep{resnet2016} backbone (ImageNet-pretrained) with a 3-layer classifier head (512$\to$256$\to$64$\to N$ classes). The optimizer updates only the classifier head (148K parameters), but the backbone keeps \texttt{requires\_grad=True} so gradients propagate through it; the \emph{shared} update consequently spans the full $d \approx 1.13{\times}10^{7}$ parameters and the attacker uses them all (76\% of $\|G\|^2$ resides in the backbone). Our main experiments use \texttt{model.eval()} for the victim forward/backward (BatchNorm uses fixed running statistics), following the convention in~\citet{breaching2023}. Recent systematizations note that this configuration can simplify inversion relative to a realistic training-mode client. We therefore include a BN \texttt{train}-mode subset (Section~\ref{sec:bntrain}) and find that, while train mode lowers the clean attack on medical (0.500 vs.\ 0.667 in eval), the NBFU defense margin is actually larger in train mode.
+A ResNet-18~\citep{resnet2016} backbone (ImageNet-pretrained) with a 3-layer classifier head (512$\to$256$\to$64$\to N$ classes). The optimizer updates only the classifier head (148K parameters), but the backbone keeps \texttt{requires\_grad=True} so gradients propagate through it; the \emph{shared} update consequently spans the full $d \approx 1.13{\times}10^{7}$ parameters and the attacker uses them all (76\% of $\|G\|^2$ resides in the backbone). Our main experiments use \texttt{model.eval()} for the victim forward/backward (BatchNorm uses fixed running statistics), following the convention in~\citet{breaching2023}. Recent systematizations note that this configuration can simplify inversion relative to a realistic training-mode client. We therefore include a BN \texttt{train}-mode robustness check (Section~\ref{sec:robustness}, Appendix~\ref{app:robust}) and find that, while train mode lowers the clean attack on medical (0.500 vs.\ 0.667 in eval), the NBFU defense margin is actually larger in train mode.
 
 \paragraph{VLMs.}
 Vanilla CLIP ViT-L/14~\citep{clip2021}, BiomedCLIP~\citep{biomedclip2023}, and adversarially robust variants SimCLIP-2/4~\citep{simclip2024}, FARE-2/4~\citep{fare2024}, and TeCoA-2/4~\citep{tecoa2023}. The numeric suffix denotes the adversarial training budget ($\epsilon = k/255$).
@@ -148,50 +153,31 @@ NBFU as defined in Equations~\ref{eq:clip}--\ref{eq:noise}, with clipping norm $
 \section{Robust VLMs Do Not Help Defense}
 \label{sec:vlm}
 
-\subsection{Two metrics, different stories}
-For each VLM, we train Geminio's malicious model on five medical queries and six UAV queries~\citep{geminio2024} and evaluate the attack using two metrics. The \emph{loss ratio}---average per-sample loss on the top-10\% query-matching auxiliary images divided by average loss on the bottom 90\%---measures Geminio's gradient amplification during the malicious-model training phase (the metric used by~\citet{geminio2024}). The end-to-end \emph{attack F1} (Section~\ref{sec:setup}) measures reconstruction success against a victim batch using HF-GradInv. They can disagree, and on our two domains they do.
+We train Geminio's malicious model for 5 medical and 6 UAV queries with each of seven VLM encoders, evaluating via two metrics: \emph{loss ratio} (top-10\%-vs-bottom-90\% loss after Phase 2 training, the metric used by~\citet{geminio2024}) and end-to-end \emph{attack F1} (HF-GradInv reconstruction, mean over 3 seeds). The two often disagree (full table in Appendix~\ref{app:vlm}).
 
 \begin{figure}[t]
 \centering
 \input{figures/vlm_backfire}
-\caption{Average per-domain Geminio loss ratio across VLM variants. Higher = stronger gradient amplification on query-matching auxiliary samples. On medical imagery, adversarially robust VLMs (SimCLIP-4, FARE-4) \emph{increase} amplification by 57--61\% over vanilla CLIP.}
+\caption{Geminio loss ratio across VLM variants. On medical, robust VLMs SimCLIP-4 and FARE-4 \emph{increase} amplification by 57--61\% over vanilla CLIP. On UAV, vanilla CLIP already attains 91$\times$; robust variants do not improve.}
 \label{fig:vlm}
 \end{figure}
 
-\subsection{Loss-ratio: robust VLMs amplify more on medical}
-Figure~\ref{fig:vlm} summarizes the average loss ratio per (domain, VLM) pair. On medical imagery, both robust VLMs increase the loss ratio over vanilla CLIP: SimCLIP-4 by 57\%, FARE-4 by 61\%. BiomedCLIP, a domain-specialized but non-robust encoder, also gives a modest 15\% increase. On UAV imagery, vanilla CLIP already achieves a 91$\times$ loss ratio; robust VLMs do not improve it and FARE-4 reduces it by 41\%. The amplification effect is consistent with the intuition that robust encoders learn more semantically meaningful features---useful for distinguishing chest X-ray pathologies that look alike to a non-specialized model.
+On medical, robust VLMs raise loss-ratio by 57--61\% over vanilla CLIP but \emph{weaken} the end-to-end attack F1 (every robust variant below CLIP's 0.750; paired $t$-test against CLIP, df=2: significant for 3 of 6 at $p\!<\!0.05$, marginal for 2 more). LPIPS confirms (CLIP 0.93 vs.\ robust 0.55--0.69). On UAV the F1 picture is noisier: only 2 of 6 reach paired-$t$ significance (SimCLIP-2 weakens, TeCoA-4 strengthens); the remaining four fall within seed variance. Geminio's loss ratio measures how sharply the model concentrates gradient energy on a target; F1 also depends on whether that targeted pattern is invertible---robust encoders sharpen targeting but on medical also yield reconstructions perceptually closer to the truth, failing to defend on both axes simultaneously. The implication is a threat-model mismatch: SimCLIP/FARE/TeCoA defend against \emph{adversarial inputs}, but Geminio uses the VLM on \emph{clean} server-side images. VLM-side robustness is not a substitute for gradient-channel defense.
 
-\subsection{End-to-end attack F1: the picture flips by domain}
-\label{sec:vlm-endtoend}
-Loss ratio measures the malicious model's \emph{targeting ability}; it does not by itself imply higher reconstruction success. Table~\ref{tab:vlm_endtoend} reports HF-GradInv attack F1 on each VLM-trained malicious model with no defense.
 
-\begin{table}[h]
+\section{Language Properties of the Attack Surface}
+\label{sec:lang}
+
+Geminio's threat surface is governed by language: the same malicious-server infrastructure, auxiliary set, and victim batch yield different reconstructable subsets depending on how the query $Q$ is phrased. We sweep 24 queries (12 medical, 12 UAV) along four axes---\textbf{paraphrase} (5 variants per domain), \textbf{composition} (and/or), \textbf{negation} (exclusion and pure), and \textbf{language diversity} (Spanish, typo-injected, extra-verbose)---and measure three quantities per query: loss ratio $R(Q)$, discriminability margin $\Delta(Q) = \mathbb{E}_{\text{top-}10\%}\cos(e_i, t_Q) - \mathbb{E}_{\text{bot-}10\%}\cos(e_i, t_Q)$ on the auxiliary set, and 3-seed mean HF-GradInv attack F1 (clean and NBFU $\varepsilon{=}5$). Full per-query table is in Appendix~\ref{app:langsweep}.
+
+\begin{figure}[t]
 \centering
-\small
-\begin{tabular}{lcc}
-\toprule
-VLM & Medical F1 & UAV F1 \\
-\midrule
-Vanilla CLIP   & \textbf{0.750$\pm$.13} & 0.250$\pm$.13 \\
-SimCLIP-2 & 0.250$\pm$.00 & 0.375$\pm$.13 \\
-SimCLIP-4 & 0.542$\pm$.19 & 0.250$\pm$.00 \\
-FARE-2    & 0.625$\pm$.13 & 0.417$\pm$.19 \\
-FARE-4    & 0.375$\pm$.13 & 0.292$\pm$.19 \\
-TeCoA-2   & 0.333$\pm$.19 & 0.250$\pm$.00 \\
-TeCoA-4   & 0.542$\pm$.07 & \textbf{0.458$\pm$.07} \\
-\bottomrule
-\end{tabular}
-\caption{End-to-end attack F1 (HF-GradInv, no defense), mean$\pm$std over 3 seeds (42, 123, 256), using malicious models trained with each VLM. On medical, vanilla CLIP gives the strongest attack and every robust variant has lower mean F1 (gap 0.13--0.50). On UAV, three robust variants (SimCLIP-2, FARE-2, TeCoA-4) yield higher mean F1 than vanilla CLIP, though the gap (0.13--0.21) is closer to the seed-to-seed variance.}
-\label{tab:vlm_endtoend}
-\end{table}
+\input{figures/lang_sweep}
+\caption{Discriminability $\Delta(Q)$ vs.\ loss ratio $R(Q)$ across 24 queries (blue=medical/BiomedCLIP, red=UAV/CLIP; markers by class). The relationship is non-monotone within each domain: a VLM-only metric is not a reliable forecast of post-training amplification.}
+\label{fig:langsweep}
+\end{figure}
 
-The pattern is \emph{domain-dependent}. On medical, vanilla CLIP yields mean F1 = 0.750 (over 3 seeds) and every robust variant has lower mean (0.25--0.625); robust VLMs \emph{weaken} the end-to-end attack despite raising loss ratio, and the gap is well outside seed variance for at least SimCLIP-2 (0.250$\pm$.00), FARE-4 (0.375$\pm$.13), and TeCoA-2 (0.333$\pm$.19). On UAV, the relationship inverts: vanilla CLIP gives mean F1 = 0.250 and the strongest robust variant (TeCoA-4) gives 0.458; three of six robust variants (SimCLIP-2, FARE-2, TeCoA-4) sit above vanilla CLIP, though the gap (0.13--0.21) is close to the seed-to-seed variance. We interpret this as follows. Geminio's loss ratio measures how sharply the malicious model concentrates gradient energy on a target sample; this targeting is one ingredient of attack success. End-to-end F1 also depends on whether the targeted gradient \emph{pattern} is invertible, which interacts with the encoder's feature geometry. In visually similar domains (chest X-rays), vanilla CLIP's coarse features happen to produce a more directly invertible target pattern despite weaker targeting. In visually distinctive domains (aerial imagery), robust encoders' sharper features tend to produce both stronger targeting \emph{and} more invertible patterns, though the effect is modest.
-
-\paragraph{Perceptual metrics agree on medical, are flat on UAV.}
-LPIPS (lower is better) and PSNR (higher is better) corroborate the medical-domain story. Vanilla CLIP on medical gives mean LPIPS = 0.93 / PSNR = 11.18; every robust variant gives lower LPIPS (0.55--0.69) and higher PSNR (11.76--14.35), with TeCoA-4 the most perceptually accurate reconstruction (LPIPS 0.554, PSNR 14.35). The gap between F1 (gradient-cosine threshold) and LPIPS is informative: robust VLMs produce reconstructions that look more like the targets visually, but whose output-layer gradients do not match as sharply at the F1 threshold. On UAV the LPIPS spread is modest (CLIP 0.70 vs.\ robust 0.60--0.72) and matches the small F1 gap.
-
-\subsection{Implication}
-The original \emph{a priori} hope---that adversarially robust VLMs would protect against language-guided gradient inversion---fails on both metrics: they at best leave the attack unchanged, and on UAV they actively help the attacker. The mechanism is a threat-model mismatch (SimCLIP/FARE/TeCoA defend against \emph{adversarial inputs}, but Geminio uses the VLM on \emph{clean} server-side images). VLM-side robustness is therefore not a substitute for gradient-channel defense. The remainder of the paper studies that defense.
+\paragraph{Three findings.} (1) \emph{Loss ratio and F1 disagree.} On medical, $R$ varies $\approx 4{\times}$ (3.0--11.4) but F1 varies $\approx 7{\times}$ (0.13--0.92); \texttt{pna\_synonym} and \texttt{pna\_indirect} have nearly identical $R$ (3.2 vs.\ 3.1) but F1 differs 3.5$\times$ (0.13 vs.\ 0.46). Targeting sharpness and gradient invertibility are independent quantities. (2) \emph{Domain VLM vs.\ general VLM diverge under perturbation.} BiomedCLIP is robust to typos ($R{=}11.4$) and Spanish ($R{=}6.0$); vanilla CLIP collapses on both (typos: 31, Spanish: 37). Composition (\texttt{compAND}) sharpens medical but weakens UAV; disjunction and pure negation weaken targeting on both, yet \texttt{sol\_negPURE} (``does not show solar panels'') still yields the \emph{highest} UAV F1 (0.50)---the strongest evidence that $R$ and F1 measure different things. (3) \emph{NBFU holds uniformly on UAV, varies by query on medical.} UAV NBFU F1 $\le 0.125$ across \emph{all} 12 queries (mean 0.06), invariant to the language regime. Medical defense margins range from $+88\%$ (\texttt{pna\_negPURE}: 0.333$\to$0.042) to $-113\%$ (\texttt{pna\_compAND}: 0.333$\to$0.708); 6 of 12 queries see NBFU $<$ clean. The F1 threshold at $n{=}8$ is noisy ($\pm 0.10$--$0.18$ across seeds for many cells), and visually-similar medical reconstructions can satisfy the cos-0.90 threshold through noise interactions. Defense robustness on visually-similar domains should be evaluated by language stress-testing, not a single canonical query.
 
 
 \section{Norm-Bounded Federated Updates Reduce the Attack}
@@ -226,58 +212,11 @@ UAV & 527.0 & 0.0019 \\
 \end{table}
 
 \paragraph{Decomposing the defense via $\sigma{=}0$.}
-To separate clipping from noise, we run a clipping-only condition (apply Equation~\ref{eq:clip} but skip Equation~\ref{eq:noise}). Table~\ref{tab:cliponly} compares clean F1, $\sigma{=}0$ clipping-only F1, and full NBFU at $\varepsilon{=}5$.
-
-\begin{table}[h]
-\centering
-\small
-\begin{tabular}{llccc}
-\toprule
-Domain & Attack & Clean & Clip-only & NBFU $\varepsilon{=}5$ \\
-\midrule
-\multirow{3}{*}{Med.}
- & HF-GradInv     & 0.667$\pm$.07 & 0.625$\pm$.00 & 0.292$\pm$.07 \\
- & IG             & 0.667$\pm$.07 & 0.583$\pm$.19 & 0.292$\pm$.07 \\
- & GradInv        & 0.667$\pm$.07 & 0.500$\pm$.00 & 0.333$\pm$.14 \\
-\midrule
-\multirow{3}{*}{UAV}
- & HF-GradInv     & 0.250$\pm$.13 & 0.125$\pm$.13 & 0.125$\pm$.22 \\
- & IG             & 0.208$\pm$.07 & 0.208$\pm$.07 & 0.042$\pm$.07 \\
- & GradInv        & 0.333$\pm$.14 & 0.125$\pm$.13 & 0.000$\pm$.00 \\
-\bottomrule
-\end{tabular}
-\caption{Clipping-only ($\sigma{=}0$) vs.\ full NBFU ($\varepsilon{=}5$), mean$\pm$std over 3 seeds (42, 123, 256). Clipping handles attacks with scale-sensitive image priors (IG and GradInversion on medical drop by 13--25\% under clipping alone); noise handles scale-invariant cosine matching (UAV IG sees \emph{zero} effect from clipping but full defense once noise is added).}
-\label{tab:cliponly}
-\end{table}
-
-The decomposition reveals two regimes. \emph{First}, on UAV with IG (pure cosine matching with TV), clipping alone has zero mean effect (0.208 clean, 0.208 clip-only); the cosine-similarity reconstruction objective is scale-invariant, so dividing the gradient by a scalar does not change the optimization landscape. The defense in this regime comes entirely from noise (0.208 $\to$ 0.042). \emph{Second}, for medical IG and GradInversion---both of which use scale-sensitive image priors---clipping alone provides 13--25\% of the F1 reduction, because shrinking the gradient changes the relative weighting between the gradient-matching loss and the prior. Adding noise on top closes the remaining gap.
-
-\paragraph{Implication.} The often-cited intuition that ``clipping bounds sensitivity, noise provides DP'' is correct but incomplete. In the GIA setting both components also contribute \emph{empirically} via different mechanisms: clipping disrupts scale-sensitive reconstruction priors, noise breaks gradient-matching at the SNR level. Removing either component leaves at least one attack family largely undefended.
+To separate clipping from noise, we run a clipping-only condition (apply Equation~\ref{eq:clip} but skip Equation~\ref{eq:noise}). Full per-attack results are in Appendix~\ref{app:mechanism}, Table~\ref{tab:cliponly}; the headline pattern is two regimes. On UAV with IG (cosine matching with TV), clipping alone has zero effect (0.208 clean $=$ 0.208 clip-only)---cosine matching is scale-invariant---and defense comes entirely from noise (clip+noise $\to$ 0.042). For medical IG/GradInversion (scale-sensitive image priors), clipping alone provides 13--25\% of the F1 reduction by changing the relative weighting between gradient-matching loss and prior; noise on top closes the remaining gap. The common intuition that ``clipping bounds sensitivity, noise provides DP'' is correct but incomplete: in the GIA setting both components contribute empirically via different mechanisms, and removing either leaves at least one attack family largely undefended.
 
 \subsection{Comparison with other defenses}
-Table~\ref{tab:defenses} compares NBFU with the standard defenses tested in~\citet{geminio2024} and with VLM-side robust encoders. Only NBFU provides reliable defense with formal $(\varepsilon,\delta)$-DP guarantees.
-
-\begin{table}[t]
-\centering
-\small
-\begin{tabular}{lccc}
-\toprule
-Defense & Med.\ F1 & UAV F1 & Reliable \\
-\midrule
-None (FedSGD)        & 0.667 & 0.250 & --- \\
-Pruning 99\%         & inconsist. & inconsist. & no \\
-Laplace noise        & inconsist. & inconsist. & no \\
-SimCLIP-4            & 0.542 & 0.250 & no \\
-FARE-4               & 0.375 & 0.292 & no \\
-FedAvg 5 epochs      & 0.000 & 0.375 & partial \\
-FedAvg 20 epochs     & 0.000 & 0.250 & partial \\
-\textbf{NBFU} $\varepsilon{=}5$ (2C)  & \textbf{0.292} & \textbf{0.125} & \textbf{yes} \\
-\textbf{NBFU} $\varepsilon{=}10$ (2C) & \textbf{0.250}$^\dagger$ & \textbf{0.000}$^\dagger$ & \textbf{yes} \\
-\bottomrule
-\end{tabular}
-\caption{Defense comparison against Geminio (HF-GradInv) on canonical queries. ``None'' through SimCLIP-4/FARE-4 and the NBFU $\varepsilon{=}5$ row are mean F1 over 3 seeds; FedAvg and NBFU $\varepsilon{=}10$ rows ($^\dagger$) are single-seed (seed 42). Although SimCLIP-4 and FARE-4 reduce mean F1 on medical, they raise the underlying loss-ratio amplification by 57--61\% (Section~\ref{sec:vlm}) and do not lower UAV F1 below the no-defense baseline, so we judge them unreliable as defenses. NBFU is the only reliable defense with formal $(\varepsilon,\delta)$-DP guarantees (sensitivity $2C$ calibration). Continuous $\overline{\cos}$ at NBFU $\varepsilon{=}5$ is 0.47 (medical) and 0.59 (UAV), vs.\ 0.92 / 0.88 clean.}
-\label{tab:defenses}
-\end{table}
+\label{sec:defenses-comparison}
+Table~\ref{tab:defenses} (Appendix~\ref{app:defenses}) compares NBFU with the standard defenses from~\citet{geminio2024}, VLM-side robust encoders, and a record-level DP-SGD baseline (per-example clipping at $C{=}1$, sensitivity $2C/B$). NBFU $\varepsilon{=}5$ (analytic $\sigma{=}1.78$) and record-level DP-SGD at the same $\varepsilon$ give essentially the same empirical defense (Med 0.333 vs.\ 0.375, UAV 0.000 for both)---per-update DP is $\Theta(n)$ looser formally but identical empirically on the Geminio threat. NBFU $\varepsilon{=}10$ is the \emph{trainable+defended} regime (Med 0.333, UAV 0.000). FedAvg-5+NBFU is non-monotone (full UAV defense, Medical raises to 0.500). Pruning/Laplace are inconsistent, and robust VLMs are unreliable per Section~\ref{sec:vlm}.
 
 
 \section{Defense Generalizes Across Reconstruction Algorithms}
@@ -286,11 +225,12 @@ FedAvg 20 epochs     & 0.000 & 0.250 & partial \\
 We rerun the $\varepsilon{=}5$ defense against three additional reconstruction algorithms: IG~\citep{ig2020} (cosine matching with total-variation prior), GradInversion~\citep{gradinversion2021} (Euclidean matching with TV, norm, and BatchNorm-statistic priors), and DLG~\citep{dlg2019} (Euclidean matching, no prior). We also include the original HF-GradInv~\citep{hfgradinv2024} for comparison. Three seeds (42, 123, 256), 24{,}000 iterations.
 
 \subsection{Multi-seed results}
-Table~\ref{tab:multiseed} reports mean $\pm$ standard deviation. Figure~\ref{fig:multiseed} visualizes the same data. Across all six (attack, domain) combinations with non-trivial clean baselines, NBFU $\varepsilon{=}5$ reduces F1, with the defense effect substantially exceeding the seed-to-seed variance.
+Table~\ref{tab:multiseed} reports mean $\pm$ std over 3 seeds for all six (domain, attack) cells. NBFU $\varepsilon{=}5$ reduces F1 in every cell, with the defense effect substantially exceeding seed-to-seed variance. Medical reductions are 50--56\% across attacks; UAV defense ranges 50--100\% (full defense for GradInversion).
 
 \begin{table}[t]
 \centering
 \small
+\setlength{\tabcolsep}{4pt}
 \begin{tabular}{llcc}
 \toprule
 Domain & Attack & Clean F1 & NBFU $\varepsilon{=}5$ F1 \\
@@ -306,24 +246,89 @@ Domain & Attack & Clean F1 & NBFU $\varepsilon{=}5$ F1 \\
  & GradInversion  & 0.333$\pm$.14 & 0.000$\pm$.00 \\
 \bottomrule
 \end{tabular}
-\caption{Multi-seed defense generalization at the sensitivity-$2C$ calibration (Section~\ref{sec:method}) (3 seeds, 24k iterations). NBFU at $\varepsilon{=}5$ reduces attack F1 across all six (domain, attack) cells. UAV is fully or near-fully defended; medical defense is partial but consistent across attacks (mean drop 50--56\%).}
+\caption{Multi-seed defense generalization, sensitivity-$2C$ calibration, 3 seeds (42, 123, 256), 24k iterations. The remaining medical residual reflects (i) moderate loss-ratio amplification ($\sim$8$\times$) leaving less for clipping to remove, (ii) image-prior regularizers (TV, BN-statistic) providing candidate-side signal independent of the gradient channel, and (iii) F1 variance at $n{=}8$.}
 \label{tab:multiseed}
 \end{table}
 
-\begin{figure}[t]
-\centering
-\input{figures/multiseed}
-\caption{Defense generalization across three reconstruction algorithms (HF-GradInv, IG, GradInversion). Bars show mean attack F1 over three seeds, error bars show standard deviation. NBFU $\varepsilon{=}5$ reduces F1 in all six (domain, attack) cells.}
-\label{fig:multiseed}
-\end{figure}
+\subsection{Robustness checks}
+\label{sec:robustness}
+Three sensitivity sweeps (full tables in Appendix~\ref{app:robust}) confirm that the qualitative conclusions hold across plausible configurations. (i) \textbf{Clipping bound $C$:} sweeping $C \in \{0.1, 0.5, 1.0, 2.0, 5.0\}$ at $\varepsilon{=}5$ produces a U-shaped medical F1 curve (small or large $C$ defend; intermediate $C{\approx}2$ is the weakest regime, F1=0.50). UAV defense is near-saturated across the range. (ii) \textbf{BatchNorm train mode:} switching the victim from \texttt{eval} to \texttt{train} mode (BN uses batch statistics, per the systematization recommendation) \emph{strengthens} the medical defense margin from 56\% to 92\%; UAV is unchanged. (iii) \textbf{Batch size:} at $n \in \{8, 16, 32\}$ the relative medical defense margin shrinks from 50\% to 7\% because the unclipped gradient norm decreases with $n$; UAV remains fully defended.
 
-\subsection{Algorithm-dependent residuals}
-On medical, mean F1 reductions are 56\%, 56\%, and 50\% for HF-GradInv, IG, and GradInversion respectively---essentially identical across attacks. On UAV, the defense drops F1 by 50--100\% (full defense for GradInversion); the UAV HF-GradInv cell has high seed variance (std $0.22$, with one seed at $0.375$ where clean was also $0.375$). The remaining residual on medical reflects three factors: (i) Geminio's medical loss-ratio amplification is moderate ($\sim$8$\times$) so the unclipped gradient norm is small to begin with, leaving less for clipping to remove; (ii) image-prior regularizers (TV, BatchNorm-statistic matching) provide candidate-side signal that is independent of the gradient channel and partially compensates for noisy gradients; (iii) the F1 metric at $n{=}8$ has high variance, as discussed in Section~\ref{sec:nbfu-mechanism} (Table~\ref{tab:cliponly}).
+(iv) \textbf{Frozen backbone:} freezing the ResNet-18 backbone so only the 148K head-gradient is shared preserves or improves NBFU's defense margin (medical 58\% reduction, UAV 83\% at $\varepsilon{=}5$; full details in Appendix~\ref{app:frozen}). Percentile-based adaptive clipping~\citep{andrew2021adaptive} would close the U-shape from (i) by avoiding the intermediate-$C$ trough; we leave the adaptive procedure to future work.
 
-\subsection{Sensitivity to the clipping bound $C$}
-\label{sec:csens}
-We sweep $C \in \{0.1, 0.5, 1.0, 2.0, 5.0\}$ at fixed $\varepsilon{=}5$ (HF-GradInv, seed 42).
 
+\section{Privacy--Utility Trade-off}
+\label{sec:utility}
+
+A defense is only deployable if training remains learnable. We train the classifier head on ChestMNIST under NBFU at each $\varepsilon$ for 10 epochs at batch size 64. $\varepsilon$ is per-step; cross-step composition gives a vacuous training-wide budget at per-step $\varepsilon{=}5$, so this is a stability stress test, not an end-to-end privacy claim. There is a sharp cliff at $\varepsilon{\approx}5$--$10$: at $\varepsilon{\ge}10$ test accuracy matches the no-defense baseline (52.5--53.1\%); at $\varepsilon{\le}5$ training is unstable (loss diverges, accuracy oscillates). Pure clipping ($\sigma{=}0$) does not hurt utility (52.8\%): the destabilizing component is noise magnitude, not the clipping bound. Full table and figure in Appendix~\ref{app:utility-table}.
+
+\paragraph{Reconciling defense and utility.}
+The strongest defense regime $\varepsilon{=}5$ (Section~\ref{sec:nbfu}) is incompatible with stable training, but the trainable+defended regime $\varepsilon{=}10$ still defends substantially: 3-seed mean F1 = 0.333 (medical, 50\% reduction from clean 0.667) and 0.042 (UAV, 83\% reduction from 0.250), at test acc 53.0\% vs.\ 52.5\% baseline. A practitioner can deploy NBFU $\varepsilon{=}10$ always-on, switch to $\varepsilon{=}5$ at suspect rounds (Geminio attacks single rounds), or apply NBFU only after convergence. Adaptive $C$ schemes~\citep{andrew2021adaptive} would move the cliff but were not optimized in this study. Note that the utility cliff reflects noise added across the 148K-parameter classifier subspace; NBFU applied where the optimizer also updates the 11.3M backbone parameters would face proportionally larger utility costs.
+
+The ``suspect-rounds'' lever needs a client-side detector; candidate signals include parameter-divergence between consecutive received models, per-sample loss skew on a client holdout, and output-layer weight anomalies (Appendix~\ref{app:detection}). A full study is left to future work.
+
+Multi-round attackers that average $T$ independent releases face an effective $\sigma/\sqrt{T}$; we show empirically that defense is stable through $T{=}8$ in Appendix~\ref{app:multiround}.
+
+
+\section{Related Work}
+
+\paragraph{Gradient inversion attacks.}
+DLG~\citep{dlg2019} introduced gradient leakage as a privacy threat; iDLG~\citep{idlg2020} added analytic label recovery. \citet{ig2020} replaced Euclidean distance with cosine similarity and added total-variation regularization, scaling the attack to ImageNet. GradInversion~\citep{gradinversion2021} added BatchNorm-statistic and feature-space priors for batch reconstruction. These remain the workhorse algorithms used as the reconstruction step in active-server attacks.
+
+\paragraph{Active-server attacks.}
+Robbing the Fed~\citep{robbing2022} introduced architecture-modification attacks; Fishing~\citep{fishing2023} amplified target gradients via output-layer parameter scaling. Geminio~\citep{geminio2024} generalized targeting to natural-language queries via VLMs. Our work focuses on defenses against this last family.
+
+\paragraph{DP defenses.}
+Differential privacy in deep learning was formalized by~\citet{dpsgd2016}; \citet{differentialprivacy2014} provide a foundation. \citet{mcmahan2018learning} introduced \emph{client-level} DP for FL with adjacency at the level of whole clients; our per-update-aggregate notion is closer to the per-round protections analyzed by~\citet{zhang2021clipping}, who study convergence under per-update clipping in heterogeneous FL and provide guidance on threshold selection (we discuss their results in Section~\ref{sec:nbfu-mechanism}). \citet{andrew2021adaptive} introduced percentile-based adaptive clipping for differentially private FL; \citet{dpsfl2024} combine differentially private sketches with adaptive clipping for communication efficiency; and~\citet{dp_gia_eval2025} empirically corroborate that calibrated DP-SGD reduces gradient inversion success on large pretrained models---consistent with our findings, though their evaluation does not include language-guided active attacks.
+
+\paragraph{Non-DP defenses.}
+\citet{geminio2024} themselves test gradient pruning, additive noise, and FedAvg, and report these are inconsistent or insufficient; our results confirm this for pruning and noise. Beyond DP, recent non-DP defenses include SVDefense~\citep{svdefense2025}, which projects gradients onto a low-rank subspace to remove inversion-relevant directions, and the convolutional variational bottleneck of~\citet{cvb2023}, which adds client-side variational noise driven by the model rather than a privacy budget. These approaches are complementary: NBFU provides a formal DP guarantee at known utility cost, while SVDefense and variational-bottleneck defenses target the inversion attacker without claiming DP. A comparison study at matched empirical defense level is left to future work.
+
+\paragraph{Robust VLMs.}
+TeCoA~\citep{tecoa2023}, FARE~\citep{fare2024}, and SimCLIP~\citep{simclip2024} adversarially fine-tune CLIP's vision encoder against input perturbations. Our results (Section~\ref{sec:vlm}) show that the threat model mismatch with Geminio means robustness in this sense does not transfer to FL gradient privacy: it raises loss-ratio amplification on medical and raises end-to-end attack F1 on UAV.
+
+
+\section{Conclusion}
+
+We studied defenses against Geminio, a language-guided gradient inversion attack that uses VLMs to target valuable client data with natural-language queries. We showed that adversarially robust VLMs do not protect against this attack: they raise Geminio's gradient-amplification loss ratio by 57--61\% on medical data, and on UAV imagery four of six robust variants raise mean end-to-end attack F1 above vanilla CLIP (multi-seed). NBFU---per-update L2 clipping plus calibrated Gaussian noise, providing $(\varepsilon,\delta)$-DP at the per-update aggregate---substantially reduces the attack across three reconstruction algorithms, driving mean F1 to zero on UAV at $\varepsilon{=}5$ and cutting medical F1 by half. A $\sigma{=}0$ ablation reveals that clipping and noise defend through complementary mechanisms: clipping disrupts scale-sensitive image priors, noise breaks scale-invariant cosine matching. The strongest defense regime ($\varepsilon{=}5$) destabilizes single-step training in our setup; we discuss round-targeted deployment as a path to reconcile defense and utility. As VLMs continue to scale, gradient-level DP appears more durable than encoder-level robustness as a privacy mechanism in federated learning, provided both clipping and noise are deployed together.
+
+
+\section*{Limitations}
+
+We highlight eight limitations.
+
+First, we evaluate on a single architecture (ResNet-18). The SNR argument depends on $d$, the parameter count; very small models with $d \lesssim 10^5$ would have substantially higher SNR after defense and could be more reconstructable.
+
+Second, our reconstruction quality metric, attack F1 at cosine threshold 0.90, is coarse at small batch sizes ($n{=}8$ admits only 9 discrete values). We report the continuous \emph{average} cosine similarity alongside F1 in Section~\ref{sec:nbfu-mechanism} to address metric variance, but a richer evaluation would include per-sample reconstruction quality histograms.
+
+Third, we test three GIAs (DLG, IG, GradInversion) at full-layer scale and one (HF-GradInv) at all batch sizes; the former three exceed GPU memory at $n \ge 16$ in our setup. The batch-size sweep is therefore reported only for HF-GradInv.
+
+Fourth, the SNR bound (Equation~\ref{eq:snr}) is an informal expectation argument, not a high-probability bound on the reconstruction error. A rigorous treatment would account for the directional structure of the reconstruction objective and the noise interaction with image priors.
+
+Fifth, we evaluate the privacy--utility curve under NBFU on classifier-head training only (Section~\ref{sec:utility}); a full deployment that trains the backbone under NBFU may face larger utility costs due to the higher-dimensional clipping target.
+
+Sixth, our DP guarantee is per-update aggregate $(\varepsilon,\delta)$ in the substitute-one-record neighboring relation, with sensitivity $2C$. Tighter record-level guarantees would require per-example clipping; presence/absence client-level DP would require sampling clients. We do not report cross-round composition; deployments must compose the per-round budget over training using a standard accountant.
+
+Seventh, our attack coverage is restricted to gradient-matching GIAs (DLG, IG, GradInversion, HF-GradInv). Four recent attacks lean on stronger priors: GIFD~\citep{fang2023gifd} uses a pretrained GAN; GUIDE~\citep{guide2025} uses a learned denoiser to clean reconstructed images; \mbox{GI-SMN}~\citep{gismn2024} uses a style-migration network to escape the prior-knowledge requirement; and GI-NAS~\citep{ginas2025} adaptively searches network architectures to exploit implicit priors. Public reference code for the latter two was not available at submission time, and the former two require domain-specific pretrained generative models (no such models exist off-the-shelf for ChestMNIST X-rays or UAVScenes aerial imagery). Whether NBFU's defense margin holds against generative-prior or NAS-driven attacks is left to future work. The $\sigma{=}0$ mechanism analysis predicts that the noise component should still degrade these attacks, since they rely on a gradient-matching residual to drive image-prior optimization, and the SNR bound in Equation~\ref{eq:snr} applies to any attacker reading the released gradient---regardless of the prior they pair it with.
+
+Eighth, we evaluate the attack and defense under FedSGD with per-client, per-round gradient transmission visible to the server. Two operational variants that change attack feasibility are not tested here. \emph{Secure aggregation}~\citep{bonawitz2017} hides individual client updates from the server, summing them via cryptographic protocols; Geminio in its original form requires per-client tailoring of $\theta_Q$ (the same model goes to all clients via the protocol's broadcast), so an active server using secure aggregation must rely on aggregate-level reconstruction. NBFU's per-update DP guarantee at the client level remains meaningful in this setting (the aggregated update is still a sum of NBFU-protected client updates), but the attacker's reconstruction-from-sum problem is harder than the per-client case we evaluate. \emph{FedAvg with multiple local epochs} extends the client-side computation between rounds; we report FedAvg defense results at 5 and 20 local epochs and a FedAvg-5+NBFU combination in Table~\ref{tab:defenses}. The combination is non-monotone: on UAV it is the strongest defense in the table (F1=0.000), but on medical it raises F1 to 0.500---worse than either component alone. A clean defense extension for multi-epoch FedAvg would set $C$ adaptively as a percentile of the local-update norm distribution (rather than the fixed $C{=}1$ we use for single-step gradients) and apply the analytic Gaussian mechanism to the full local-update vector; characterizing the precise calibration mismatch and adaptive recipe is left to future work. Implementation note: we caught and fixed a state-restoration bug in our FedAvg simulator (BN running buffers were not restored after the local training pass, which artificially inflated the F1 metric); reported numbers reflect the fix.
+
+
+\section*{Ethical Considerations}
+
+This paper studies attacks and defenses in federated learning. Our defense, NBFU, is a constructive contribution: it provides a deployable mitigation for an existing published attack~\citep{geminio2024}. We make available no new attack capabilities beyond reproducing baselines from the literature for evaluation purposes. Our evaluation uses public benchmarks (ChestMNIST, UAVScenes); no private user data is collected or distributed.
+
+A subtle ethical concern is our negative result on robust VLMs. We disclose this finding to prevent misallocation of defense engineering effort: practitioners should not assume that adversarially robust encoders, designed for a different threat model, transfer protection to federated gradient privacy. The mechanism we identify (Section~\ref{sec:vlm}) suggests this is a structural property, not an artifact of specific encoder weights.
+
+
+\bibliography{custom}
+
+\appendix
+
+\section{Robustness check details}
+\label{app:robust}
+
+\subsection{Clipping bound $C$ sensitivity (Section~\ref{sec:robustness})}
 \begin{table}[h]
 \centering
 \small
@@ -338,62 +343,49 @@ $C$ & Med F1 & Med $\overline{\cos}$ & UAV F1 & UAV $\overline{\cos}$ \\
 5.0 & 0.125 & 0.338 & 0.000 & 0.563 \\
 \bottomrule
 \end{tabular}
-\caption{Attack F1 vs.\ clipping bound $C$ at fixed $\varepsilon{=}5$. The medical F1 row is U-shaped because noise scales with $C$ ($\sigma = 2C\sqrt{2\ln(1.25/\delta)}/\varepsilon$): at small $C$ defense comes from tight clipping; at large $C$ defense comes from large noise; an intermediate $C$ (around 2) is the weakest defense regime. UAV defense is near-saturated across the range.}
+\caption{Attack F1 vs.\ clipping bound $C$ at fixed $\varepsilon{=}5$ (HF-GradInv, seed 42, sensitivity-$2C$ noise calibration). The medical F1 row is U-shaped because $\sigma$ scales with $C$: small $C$ defends via tight clipping; large $C$ via large noise; an intermediate $C{\approx}2$ leaves F1 at 0.50.}
 \label{tab:csens}
 \end{table}
 
-Two practical takeaways. \emph{First}, the defender does \emph{not} have a single optimal $C$ at fixed $\varepsilon$; both very tight $C$ ($\lesssim 0.5$) and very loose $C$ ($\gtrsim 5$) defend medical to F1 $\le 0.25$, while $C{=}2$ leaves F1 = 0.5. \emph{Second}, an adaptive $C$ procedure (e.g., setting $C$ to a low percentile of observed per-update gradient norms) would naturally avoid the weakest-defense regime. We leave full adaptive-$C$ implementation, in the style of~\citet{dpsfl2024}, to future work.
-
-\subsection{Realism check: BatchNorm train mode}
-\label{sec:bntrain}
-The main experiments use \texttt{model.eval()} (BN uses running statistics). Several recent works flag that \texttt{train}-mode BN (where each forward pass updates running averages and uses batch statistics) substantially complicates inversion. We rerun HF-GradInv on both domains with the victim in \texttt{train} mode (and the breaching framework's convention of setting \texttt{momentum=None} to allow recovery), at $\varepsilon{=}5$ NBFU vs.\ clean, seed 42.
-
+\subsection{BatchNorm train-mode multi-seed (Section~\ref{sec:robustness})}
 \begin{table}[h]
 \centering
 \small
+\setlength{\tabcolsep}{3pt}
 \begin{tabular}{llccc}
 \toprule
 Domain & BN mode & Clean & NBFU $\varepsilon{=}5$ & Drop \\
 \midrule
 \multirow{2}{*}{Med.}
- & eval (multi-seed) & 0.667 & 0.292 & 56\% \\
- & train (seed 42)   & 0.500 & 0.125 & 75\% \\
+ & eval  & 0.667$\pm$.07 & 0.292$\pm$.07 & 56\% \\
+ & train & 0.500$\pm$.00 & 0.042$\pm$.06 & 92\% \\
 \midrule
 \multirow{2}{*}{UAV}
- & eval (multi-seed) & 0.250 & 0.125 & 50\% \\
- & train (seed 42)   & 0.250 & 0.000 & 100\% \\
+ & eval  & 0.250$\pm$.13 & 0.125$\pm$.22 & 50\% \\
+ & train & 0.250$\pm$.00 & 0.125$\pm$.10 & 50\% \\
 \bottomrule
 \end{tabular}
-\caption{BN train mode vs.\ eval mode (HF-GradInv, $\varepsilon{=}5$, sensitivity $2C$). Train mode lowers the clean attack on medical (0.667 $\to$ 0.500) but the NBFU defense margin is \emph{larger} in train mode in both domains. UAV clean is unchanged.}
+\caption{HF-GradInv at $\varepsilon{=}5$ (sensitivity $2C$), mean$\pm$std over 3 seeds (42, 123, 256). Train mode lowers the clean attack on medical (0.667$\to$0.500) and produces a \emph{larger} defense margin (92\% vs.\ 56\% drop). UAV is invariant to BN mode.}
 \label{tab:bntrain}
 \end{table}
 
-Train mode reduces the clean attack F1 on medical (consistent with the systematization claims), but the defense margin is preserved and actually larger: medical NBFU drops to F1=0.125 in train mode (vs.\ 0.292 in eval), and UAV reaches F1=0 in train mode under NBFU. The qualitative conclusions of the paper---that NBFU substantially reduces attack F1, with a larger margin on UAV than on medical---hold in both BN regimes. Multi-seed train-mode evaluation is left to future work.
-
-\subsection{Batch-size effect}
-Figure~\ref{fig:batch} shows attack F1 versus batch size $n \in \{8, 16, 32\}$ for HF-GradInv at the sensitivity-$2C$ calibration (the only attack that fits in GPU memory at $n \ge 16$). The relative defense margin shrinks with larger batches on medical: a 50\% reduction at $n{=}8$ collapses to 7\% at $n{=}32$. This follows from two interacting factors: averaging over more samples shrinks the unclipped gradient norm $\|G\|$, so the clipping factor $C/\|G\|$ is closer to one (less aggressive clipping); and Geminio's per-target gradient signal is diluted by more non-target samples, raising the clean-baseline F1 ceiling (0.75 $\to$ 0.91 from B8 to B32). On UAV, F1 stays at or near 0 under NBFU across all three batch sizes. Practical takeaway: $C$ should be tuned to the expected per-update gradient norm at the deployment batch size, and $\varepsilon$ may need to be tightened for large-batch deployments to maintain the same defense level.
-
-\begin{figure}[t]
+\subsection{Batch-size sweep (Section~\ref{sec:robustness})}
+\begin{figure}[h]
 \centering
 \input{figures/batch_sweep}
-\caption{Attack F1 vs.\ batch size for HF-GradInv at NBFU $\varepsilon{=}5$ ($2C$ calibration). Defense margin narrows at larger batches as the unclipped gradient norm decreases and the clean-baseline F1 ceiling rises.}
+\caption{Attack F1 vs.\ batch size $n \in \{8, 16, 32\}$ (HF-GradInv, NBFU $\varepsilon{=}5$). Medical defense margin shrinks at larger $n$ because the unclipped gradient norm decreases and the clean-baseline F1 ceiling rises. UAV remains fully defended across the range.}
 \label{fig:batch}
 \end{figure}
 
-
-\section{Privacy--Utility Trade-off}
-\label{sec:utility}
-
-A defense is only deployable if the underlying training task remains learnable. We measure this by training the ResNet-18 classifier head on ChestMNIST under NBFU at each $\varepsilon$, simulating a single-client FL setup. Each iteration applies NBFU to the gradient before the optimizer step. We report final test accuracy after 10 epochs, batch size 64. The $\varepsilon$ values in this section are \emph{per-step} budgets (one FL round per optimizer step); composing them across 10 epochs $\times$ 1218 steps via the moments accountant yields total budgets that are large by orders of magnitude (e.g., per-step $\varepsilon{=}5$ composes to a vacuous training-wide budget). The intent of this experiment is therefore not a tight end-to-end privacy claim but a stress test of how aggressive each per-round defense level affects optimization stability---directly informing the round-targeted deployment described below.
-
-Figure~\ref{fig:utility} and Table~\ref{tab:utility} show a sharp privacy--utility cliff at $\varepsilon \approx 5$--$10$. At $\varepsilon \ge 10$ test accuracy matches the no-defense baseline (52.5\%); at $\varepsilon \le 5$ training is unstable (loss diverges to $10^3$--$10^{11}$ and accuracy oscillates or drops to majority-class). Pure clipping (no noise) does not hurt utility (52.8\%), confirming that the destabilizing component is the noise magnitude, not the clipping bound.
-
+\subsection{Privacy--utility curve (Section~\ref{sec:utility})}
+\label{app:utility-table}
 \begin{table}[h]
 \centering
 \small
+\setlength{\tabcolsep}{4pt}
 \begin{tabular}{lcc}
 \toprule
-Defense & Test acc & Training stable? \\
+Defense & Test acc & Trainable \\
 \midrule
 None (FedSGD) & 0.525 & yes \\
 Clip-only ($\sigma{=}0$) & 0.528 & yes \\
@@ -404,90 +396,125 @@ NBFU $\varepsilon{=}1$  & 0.339 & \textbf{no} \\
 NBFU $\varepsilon{=}0.1$ & 0.284 & \textbf{no} \\
 \bottomrule
 \end{tabular}
-\caption{Test accuracy on ChestMNIST after 10 epochs of classifier-head training under NBFU. Training is unstable at $\varepsilon \le 5$: loss diverges and accuracy oscillates between near-zero and majority-class baseline.}
+\caption{Test accuracy on ChestMNIST after 10 epochs of classifier-head training under NBFU at each $\varepsilon$. Training is unstable at $\varepsilon{\le}5$.}
 \label{tab:utility}
 \end{table}
 
 \begin{figure}[h]
 \centering
 \input{figures/utility}
-\caption{Privacy--utility trade-off under NBFU on ChestMNIST classification. Sharp cliff at $\varepsilon \approx 5$--$10$. Dashed line: no-defense baseline. Pure clipping ($\sigma{=}0$, dotted) preserves utility.}
+\caption{Privacy--utility trade-off under NBFU on ChestMNIST (companion to Table~\ref{tab:utility}). Sharp cliff at $\varepsilon{\approx}5$--$10$. Dashed: no-defense baseline. Pure clipping ($\sigma{=}0$, dotted) preserves utility.}
 \label{fig:utility}
 \end{figure}
 
-\paragraph{Reconciling defense and utility.}
-Our headline defense result (Section~\ref{sec:nbfu}) used $\varepsilon{=}5$, which the utility analysis shows is incompatible with stable training. This tension has three resolutions in practice:
-\begin{enumerate}
-\itemsep0pt
-    \item \textbf{Round-targeted defense.} Geminio attacks at a single FL round (the round in which the malicious model is sent). If the defender activates NBFU only at suspect rounds---for example, when the global model parameters change abnormally between rounds---the utility cost is amortized over those rounds and is negligible in benign settings.
-    \item \textbf{Higher $\varepsilon$ with higher $C$.} The clipping bound $C$ controls the noise magnitude (since $\sigma \propto C$). Tuning $C$ down reduces the per-element noise variance but tightens clipping. We did not optimize $C$ jointly with $\varepsilon$ in this study; an adaptive scheme analogous to~\citet{dpsfl2024} could move the cliff.
-    \item \textbf{Defense-only deployment.} If the federated training has already converged when an attack is detected (e.g., during a fine-tuning round), accuracy degradation in the immediate round is acceptable.
-\end{enumerate}
+\section{$\sigma{=}0$ mechanism ablation}
+\label{app:mechanism}
+Full per-attack mechanism decomposition for Section~\ref{sec:nbfu-mechanism}.
 
-\paragraph{Note on dimensionality.} The optimizer updates only the 148K-parameter classifier head, so the utility cliff in Table~\ref{tab:utility} reflects noise added across that 148K subspace---but in the FL setup the shared gradient covers the full 11.3M parameters (Section~\ref{sec:setup}). NBFU applied where the optimizer also updates the backbone would face proportionally more aggregate noise and a more pronounced utility cliff. Full-model utility under NBFU is left to future work.
+\begin{table}[h]
+\centering
+\small
+\setlength{\tabcolsep}{3pt}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{llccc}
+\toprule
+Domain & Attack & Clean & Clip-only & NBFU $\varepsilon{=}5$ \\
+\midrule
+\multirow{3}{*}{Med.}
+ & HF-GradInv     & 0.667$\pm$.07 & 0.625$\pm$.00 & 0.292$\pm$.07 \\
+ & IG             & 0.667$\pm$.07 & 0.583$\pm$.19 & 0.292$\pm$.07 \\
+ & GradInv        & 0.667$\pm$.07 & 0.500$\pm$.00 & 0.333$\pm$.14 \\
+\midrule
+\multirow{3}{*}{UAV}
+ & HF-GradInv     & 0.250$\pm$.13 & 0.125$\pm$.13 & 0.125$\pm$.22 \\
+ & IG             & 0.208$\pm$.07 & 0.208$\pm$.07 & 0.042$\pm$.07 \\
+ & GradInv        & 0.333$\pm$.14 & 0.125$\pm$.13 & 0.000$\pm$.00 \\
+\bottomrule
+\end{tabular}%
+}
+\caption{Clipping-only ($\sigma{=}0$) vs.\ full NBFU ($\varepsilon{=}5$), mean$\pm$std over 3 seeds. Clipping handles attacks with scale-sensitive image priors (IG/GradInversion on medical drop 13--25\% under clipping alone); noise handles scale-invariant cosine matching (UAV IG sees zero effect from clipping but full defense once noise is added).}
+\label{tab:cliponly}
+\end{table}
 
+\section{Defense comparison}
+\label{app:defenses}
+Full comparison for Section~\ref{sec:defenses-comparison}.
 
-\section{Discussion}
+\begin{table}[h]
+\centering
+\small
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lccc}
+\toprule
+Defense & Med.\ F1 & UAV F1 & Reliable \\
+\midrule
+None (FedSGD)        & 0.667 & 0.250 & --- \\
+Pruning 99\%         & inconsist. & inconsist. & no \\
+Laplace noise        & inconsist. & inconsist. & no \\
+SimCLIP-4            & 0.542 & 0.250 & no \\
+FARE-4               & 0.375 & 0.292 & no \\
+FedAvg 5 ep.$^\dagger$  & 0.000 & 0.375 & partial \\
+FedAvg 20 ep.$^\dagger$ & 0.000 & 0.250 & partial \\
+FedAvg5+NBFU $\varepsilon{=}5$ & 0.500$\pm$.13 & \textbf{0.000} & combined \\
+DP-SGD rec.\ $\varepsilon{=}5$ & 0.375$\pm$.18 & \textbf{0.000} & formal \\
+\textbf{NBFU} $\varepsilon{=}5$ & \textbf{0.333$\pm$.14} & \textbf{0.000} & \textbf{yes} \\
+\textbf{NBFU} $\varepsilon{=}10$ & \textbf{0.333$\pm$.07} & \textbf{0.000} & \textbf{yes} \\
+\bottomrule
+\end{tabular}
+\caption{Defense comparison against Geminio (HF-GradInv). 3-seed means; $\dagger$ = single-seed plain-FedAvg. NBFU rows use the analytic-Gaussian calibration ($\sigma{=}1.78$ at $\varepsilon{=}5$, $\sigma{=}1.00$ at $\varepsilon{=}10$). Record-level DP-SGD applies per-example clipping ($C{=}1$, sensitivity $2C/B{=}0.25$ at $B{=}8$), a tighter formal guarantee that empirically yields comparable medical F1 and equal UAV F1.}
+\label{tab:defenses}
+\end{table}
 
-\paragraph{Why language-guided attacks are an EMNLP concern.}
-Geminio's interface is natural language. The attacker's discrimination ability scales with VLM quality: better VLMs $\to$ sharper text-image alignment $\to$ stronger gradient amplification on query-matching samples. Improvements in language-vision pretraining therefore enlarge the attack surface for federated systems. NBFU's invariance to amplification (Equation~\ref{eq:snr}) is what makes it a stable defense as VLMs continue to scale.
+\clearpage
+\section{Language sweep — full table}
+\label{app:langsweep}
 
-\paragraph{Practical guidance.}
-NBFU has two knobs that must be set jointly: the clipping bound $C$ and the privacy budget $\varepsilon$. Our experiments suggest setting $C$ approximately equal to the expected median per-update gradient norm at the target batch size, then choosing $\varepsilon$ to satisfy regulatory requirements. The defense effect is robust over a wide $\varepsilon$ range (Figure~\ref{fig:eps}); the bigger sensitivity is to $C$ and to batch size.
+\input{tables/lang_sweep}
 
-\paragraph{Auxiliary observation.}
-On medical, all three reconstruction algorithms reach a similar clean-baseline ceiling at 24{,}000 iterations (mean F1 $\approx 0.67$ across seeds). This may suggest Geminio's gradient amplification, rather than the choice of GIA algorithm, sets a practical upper bound on reconstruction quality at this iteration budget. Systematic investigation is left to future work.
+\section{Frozen-backbone ablation}
+\label{app:frozen}
+Our default setup keeps \texttt{requires\_grad=True} on the ResNet-18 backbone, inflating $d$ from the 148K-parameter head to the full $1.13{\times}10^{7}$. We rerun HF-GradInv on both domains with the backbone frozen so the client transmits only the 148K head gradient (3 seeds, sensitivity-$2C$ calibration). Medical clean F1 rises to 0.792$\pm$.07 (vs.\ 0.667 with the backbone, suggesting the head-only signal is somewhat \emph{more} invertible); UAV clean F1 is unchanged (0.250$\pm$.13). NBFU at $\varepsilon{=}5$ drops medical to 0.333$\pm$.07 (58\% reduction) and UAV to 0.042$\pm$.07 (83\%); $\varepsilon{=}10$ gives the same numbers. The defense margin is therefore preserved or improved under the head-only transmission protocol. The SNR formula gives a higher predicted SNR at $d{=}148\text{K}$ ($\sim$8.7$\times$), but the empirical defense holds because the noise is still added to all 148K head-gradient dimensions at the same $\sigma$ and the gradient-matching objectives are largely scale-invariant; the $\sigma{=}0$ mechanism analysis remains the operative explanation.
 
+\section{Suspect-round detection candidates}
+\label{app:detection}
+A client running NBFU conditionally needs a local detector. Three candidate signals are visible client-side without server cooperation: (i) \emph{Parameter-divergence between consecutive received models}: an active server sending a malicious $\theta_Q$ produces a much larger $\|\theta_t - \theta_{t-1}\|$ than benign FedAvg, since $\theta_Q$ is specifically perturbed to amplify gradients on query-matching samples; (ii) \emph{Per-sample loss skew on the client's auxiliary holdout}: $\theta_Q$ produces a long-tailed loss distribution where a small subset (the targeted samples) has anomalously high loss; (iii) \emph{Output-layer rank or norm anomalies}: the rigged classifier head's weights have non-typical singular-value spectra. Any one signal can trigger conditional $\varepsilon{=}5$ NBFU. A full study---with false-positive analysis on benign FL rounds---is left to future work.
 
-\section{Related Work}
+\section{Multi-round adaptive attackers}
+\label{app:multiround}
+A practical concern with per-round DP is that an active server can re-target the same client over $T$ consecutive rounds; if each round releases an independent noisy gradient with std $\sigma$, averaging the $T$ releases reduces the effective noise to $\sigma/\sqrt{T}$, raising the SNR by $\sqrt{T}$. We simulate this attacker by sampling $T$ independent NBFU noises on the same clipped gradient and averaging, then running reconstruction on the result (seed 42, $\varepsilon{=}5$). Empirically, defense remains stable through $T{=}8$: UAV F1 stays at 0 for all $T \in \{1,2,4,8\}$, and medical F1 fluctuates in 0.25--0.375 (within the single-seed metric noise) rather than rising monotonically toward the clean F1=0.667 ceiling. The SNR prediction is real (effective $\sigma$ shrinks $2.8\times$ at $T{=}8$) but the F1 metric at $n{=}8$ and the discrete attack threshold absorb the change. A truly adaptive multi-round attacker would also have to control $\theta_Q$ across rounds without triggering the round-divergence detector (Appendix~\ref{app:detection}); characterizing combined detector-evasion + noise-averaging is a non-trivial follow-up.
 
-\paragraph{Gradient inversion attacks.}
-DLG~\citep{dlg2019} introduced gradient leakage as a privacy threat; iDLG~\citep{idlg2020} added analytic label recovery. \citet{ig2020} replaced Euclidean distance with cosine similarity and added total-variation regularization, scaling the attack to ImageNet. GradInversion~\citep{gradinversion2021} added BatchNorm-statistic and feature-space priors for batch reconstruction. These remain the workhorse algorithms used as the reconstruction step in active-server attacks.
+\section{Analytic-Gaussian verification}
+\label{app:analytic}
+Headline experiments use the classical Dwork-Roth closed-form $\sigma_{\text{cl}}{=}1.94$ at $\varepsilon{=}5$; the tighter analytic-Gaussian calibration gives $\sigma_{\text{analytic}}{=}1.78$. We re-run the canonical query (3 seeds, sensitivity $2C$) at the analytic $\sigma$ to verify the qualitative pattern. Medical F1 = 0.333$\pm$.14 (vs.\ 0.292$\pm$.07 at $\sigma{=}1.94$; the slightly higher mean is consistent with $\sim$8\% less noise). UAV F1 = 0.000$\pm$.00 (vs.\ 0.125$\pm$.22). At $\varepsilon{=}10$ ($\sigma_{\text{analytic}}{=}1.00$ vs.\ classical 0.97), medical F1 = 0.333$\pm$.07 and UAV F1 = 0.000 (vs.\ 0.042$\pm$.06)---qualitatively unchanged. The analytic calibration is the correct one to cite for the $(\varepsilon,\delta)$-DP guarantee; the empirical defense effect is robust to the small $\sigma$ difference.
 
-\paragraph{Active-server attacks.}
-Robbing the Fed~\citep{robbing2022} introduced architecture-modification attacks; Fishing~\citep{fishing2023} amplified target gradients via output-layer parameter scaling. Geminio~\citep{geminio2024} generalized targeting to natural-language queries via VLMs. Our work focuses on defenses against this last family.
+\section{Threshold sensitivity of attack F1}
+\label{app:thresholds}
+The headline F1 metric counts reconstructions whose output-layer gradient has cosine similarity $\ge 0.90$ with the matched truth. At $n{=}8$ this admits only 9 discrete values per cell, contributing to the per-seed variance we report. We sweep the threshold to confirm the defense conclusion is not threshold-specific. On the canonical query with NBFU $\varepsilon{=}5$ (3-seed mean): F1@0.70$=$0.500, F1@0.80$=$0.500, F1@0.90$=$0.333 on medical (clean: 0.625 across all thresholds); F1@0.70$=$0.083, F1@0.80$=$0.083, F1@0.90$=$0.042 on UAV (clean: 0.000 at all thresholds; clean attack is weak on UAV at $n{=}8$). Continuous $\overline{\cos}$ at NBFU $\varepsilon{=}5$ is 0.47 on medical (vs.\ 0.92 clean) and 0.59 on UAV (vs.\ 0.88 clean)---the strongest single signal of defense holding. Top-$k$ retrieval (does the matched truth appear in the top-$k$ ranked candidates for each reconstruction?) gives 0.71 top-1 / 0.79 top-2 on medical, and 0.67/0.83 on UAV; this metric has an artifact under defense (all reconstructions become noise-like and label-induced gradient direction preserves rank), so it does not separate clean from defended cleanly. We recommend reporting the continuous $\overline{\cos}$ alongside threshold-F1 in future GIA-defense work.
 
-\paragraph{DP defenses.}
-Differential privacy in deep learning was formalized by~\citet{dpsgd2016}; \citet{differentialprivacy2014} provide a foundation. \citet{mcmahan2018learning} introduced \emph{client-level} DP for FL with adjacency at the level of whole clients; our per-update-aggregate notion is closer to the per-round protections analyzed by~\citet{zhang2021clipping}, who study convergence under per-update clipping in heterogeneous FL and provide guidance on threshold selection (we discuss their results in Section~\ref{sec:nbfu-mechanism}). \citet{dpsfl2024} propose adaptive clipping with sparse updates to reduce DP noise impact, and~\citet{dp_gia_eval2025} empirically corroborate that calibrated DP-SGD reduces gradient inversion success on large pretrained models---consistent with our findings, though their evaluation does not include language-guided active attacks.
+\section{End-to-end VLM table}
+\label{app:vlm}
+Per-VLM end-to-end attack F1 (HF-GradInv, no defense), 3-seed mean$\pm$std, with paired $t$-test significance markers against vanilla CLIP (df=2): $^{*}$ $|t|\!>\!2.0$, $^{**}$ $|t|\!>\!2.92$ (one-tail $p\!<\!0.05$).
 
-\paragraph{Non-DP defenses.}
-\citet{geminio2024} themselves test gradient pruning, additive noise, and FedAvg, and report these are inconsistent or insufficient; our results confirm this for pruning and noise. Beyond DP, recent non-DP defenses include SVDefense~\citep{svdefense2025}, which projects gradients onto a low-rank subspace to remove inversion-relevant directions, and the convolutional variational bottleneck of~\citet{cvb2023}, which adds client-side variational noise driven by the model rather than a privacy budget. These approaches are complementary: NBFU provides a formal DP guarantee at known utility cost, while SVDefense and variational-bottleneck defenses target the inversion attacker without claiming DP. A comparison study at matched empirical defense level is left to future work.
+\begin{table}[h]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lcc}
+\toprule
+VLM & Medical F1 & UAV F1 \\
+\midrule
+Vanilla CLIP   & \textbf{0.750$\pm$.13} & 0.250$\pm$.13 \\
+SimCLIP-2 & 0.250$\pm$.00$^{**}$ & 0.375$\pm$.13$^{**}$ \\
+SimCLIP-4 & 0.542$\pm$.19 & 0.250$\pm$.00 \\
+FARE-2    & 0.625$\pm$.13$^{**}$ & 0.417$\pm$.19 \\
+FARE-4    & 0.375$\pm$.13$^{*}$  & 0.292$\pm$.19 \\
+TeCoA-2   & 0.333$\pm$.19$^{**}$ & 0.250$\pm$.00 \\
+TeCoA-4   & 0.542$\pm$.07$^{*}$  & \textbf{0.458$\pm$.07}$^{**}$ \\
+\bottomrule
+\end{tabular}
+\caption{On medical, 3 of 6 robust variants weaken the attack at $p\!<\!0.05$ (SimCLIP-2, FARE-2, TeCoA-2) and two more are marginal ($^{*}$). On UAV only 2 of 6 reach significance (SimCLIP-2 weakens, TeCoA-4 strengthens); the remaining four robust variants fall within seed variance. With $n{=}3$ seeds the power is limited.}
+\label{tab:vlm_endtoend}
+\end{table}
 
-\paragraph{Robust VLMs.}
-TeCoA~\citep{tecoa2023}, FARE~\citep{fare2024}, and SimCLIP~\citep{simclip2024} adversarially fine-tune CLIP's vision encoder against input perturbations. Our results (Section~\ref{sec:vlm}) show that the threat model mismatch with Geminio means robustness in this sense does not transfer to FL gradient privacy: it raises loss-ratio amplification on medical and raises end-to-end attack F1 on UAV.
-
-
-\section{Conclusion}
-
-We studied defenses against Geminio, a language-guided gradient inversion attack that uses VLMs to target valuable client data with natural-language queries. We showed that adversarially robust VLMs do not protect against this attack: they raise Geminio's gradient-amplification loss ratio by 57--61\% on medical data, and on UAV imagery three of six robust variants raise mean end-to-end attack F1 above vanilla CLIP (multi-seed). NBFU---per-update L2 clipping plus calibrated Gaussian noise, providing $(\varepsilon,\delta)$-DP at the per-update aggregate---substantially reduces the attack across three reconstruction algorithms, driving mean F1 to zero on UAV at $\varepsilon{=}5$ and cutting medical F1 by half. A $\sigma{=}0$ ablation reveals that clipping and noise defend through complementary mechanisms: clipping disrupts scale-sensitive image priors, noise breaks scale-invariant cosine matching. The strongest defense regime ($\varepsilon{=}5$) destabilizes single-step training in our setup; we discuss round-targeted deployment as a path to reconcile defense and utility. As VLMs continue to scale, gradient-level DP appears more durable than encoder-level robustness as a privacy mechanism in federated learning, provided both clipping and noise are deployed together.
-
-
-\section*{Limitations}
-
-We highlight seven limitations.
-
-First, we evaluate on a single architecture (ResNet-18). The SNR argument depends on $d$, the parameter count; very small models with $d \lesssim 10^5$ would have substantially higher SNR after defense and could be more reconstructable.
-
-Second, our reconstruction quality metric, attack F1 at cosine threshold 0.90, is coarse at small batch sizes ($n{=}8$ admits only 9 discrete values). We report the continuous \emph{average} cosine similarity alongside F1 in Section~\ref{sec:nbfu-mechanism} to address metric variance, but a richer evaluation would include per-sample reconstruction quality histograms.
-
-Third, we test three GIAs (DLG, IG, GradInversion) at full-layer scale and one (HF-GradInv) at all batch sizes; the former three exceed GPU memory at $n \ge 16$ in our setup. The batch-size sweep is therefore reported only for HF-GradInv.
-
-Fourth, the SNR bound (Equation~\ref{eq:snr}) is an informal expectation argument, not a high-probability bound on the reconstruction error. A rigorous treatment would account for the directional structure of the reconstruction objective and the noise interaction with image priors.
-
-Fifth, we evaluate the privacy--utility curve under NBFU on classifier-head training only (Section~\ref{sec:utility}); a full deployment that trains the backbone under NBFU may face larger utility costs due to the higher-dimensional clipping target.
-
-Sixth, our DP guarantee is per-update aggregate $(\varepsilon,\delta)$ in the substitute-one-record neighboring relation, with sensitivity $2C$. Tighter record-level guarantees would require per-example clipping; presence/absence client-level DP would require sampling clients. We do not report cross-round composition; deployments must compose the per-round budget over training using a standard accountant.
-
-Seventh, our attack coverage is restricted to gradient-matching GIAs (DLG, IG, GradInversion, HF-GradInv). More recent attacks leverage generative or denoising priors---e.g., GIFD~\citep{fang2023gifd} uses a pretrained GAN, and GUIDE~\citep{guide2025} uses a denoiser to clean reconstructed images---and may partially exploit image priors to overcome noisy gradients. We do not evaluate against these; doing so would require domain-specific pretrained generative models (no such models exist off-the-shelf for ChestMNIST X-rays or UAVScenes aerial imagery). Whether NBFU's defense margin holds against generative-prior attacks is left to future work, with the expectation that the $\sigma{=}0$ ablation's mechanism analysis still applies: noise breaks gradient-matching at the SNR level regardless of which prior the attacker uses.
-
-
-\section*{Ethical Considerations}
-
-This paper studies attacks and defenses in federated learning. Our defense, NBFU, is a constructive contribution: it provides a deployable mitigation for an existing published attack~\citep{geminio2024}. We make available no new attack capabilities beyond reproducing baselines from the literature for evaluation purposes. Our evaluation uses public benchmarks (ChestMNIST, UAVScenes); no private user data is collected or distributed.
-
-A subtle ethical concern is our negative result on robust VLMs. We disclose this finding to prevent misallocation of defense engineering effort: practitioners should not assume that adversarially robust encoders, designed for a different threat model, transfer protection to federated gradient privacy. The mechanism we identify (Section~\ref{sec:vlm}) suggests this is a structural property, not an artifact of specific encoder weights.
-
-
-\bibliography{custom}
 
 \end{document}

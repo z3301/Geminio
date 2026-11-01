@@ -36,10 +36,14 @@ _tokenizer_cache = {}
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WEIGHT_DIR = os.path.join(_REPO_ROOT, 'pretrained_vlm')
 
-# SimCLIP weights are local .pt files containing vision encoder state dicts
+# SimCLIP and SLADE weights are local .pt files containing vision encoder state dicts
+#   SimCLIP: https://huggingface.co/hossainzarif19/SimCLIP
+#   SLADE (Hossain & Imteaj, CVPR 2025): https://huggingface.co/mdzhossain/SLADE
 SIMCLIP_WEIGHT_PATHS = {
     'simclip4': os.path.join(WEIGHT_DIR, 'simclip4.pt'),
     'simclip2': os.path.join(WEIGHT_DIR, 'simclip2.pt'),
+    'slade4': os.path.join(WEIGHT_DIR, 'slade4.pt'),
+    'slade2': os.path.join(WEIGHT_DIR, 'slade2.pt'),
 }
 
 # FARE and TeCoA weights are hosted on HuggingFace as open_clip hub models
@@ -55,7 +59,7 @@ CLIP_MODEL_NAME = 'ViT-L-14'
 CLIP_PRETRAINED = 'openai'
 EMBED_DIM = 768
 
-VALID_VLMS = {'clip', 'simclip4', 'simclip2', 'fare4', 'fare2', 'tecoa4', 'tecoa2'}
+VALID_VLMS = {'clip', 'simclip4', 'simclip2', 'fare4', 'fare2', 'tecoa4', 'tecoa2', 'slade4', 'slade2'}
 
 
 def get_vlm_model(vlm='clip', device=None):
@@ -96,11 +100,13 @@ def get_vlm_model(vlm='clip', device=None):
         if vlm in SIMCLIP_WEIGHT_PATHS:
             weight_path = SIMCLIP_WEIGHT_PATHS[vlm]
             if not os.path.exists(weight_path):
+                source = 'mdzhossain/SLADE' if vlm.startswith('slade') else 'hossainzarif19/SimCLIP'
                 raise FileNotFoundError(
                     f"Weight file not found: {weight_path}\n"
-                    f"Download from: https://huggingface.co/hossainzarif19/SimCLIP"
+                    f"Download from: https://huggingface.co/{source}"
                 )
-            checkpoint = torch.load(weight_path, map_location=device)
+            # weights_only avoids executing arbitrary pickled code from downloaded checkpoints
+            checkpoint = torch.load(weight_path, map_location=device, weights_only=True)
             model.visual.load_state_dict(checkpoint)
             print(f"Loaded {vlm} vision encoder from {weight_path}")
 

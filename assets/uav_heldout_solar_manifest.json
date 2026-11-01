@@ -1,0 +1,108 @@
+{
+  "domain": "uav",
+  "seed": 0,
+  "split": "held-out (train=False)",
+  "samples": [
+    {
+      "file": "0-0_1_2_6_7_8_9_10_16.png",
+      "dataset_index": 2602,
+      "labels": [
+        "roof",
+        "dirt_motor_road",
+        "paved_motor_road",
+        "container",
+        "airstrip",
+        "traffic_barrier",
+        "green_field",
+        "wild_field",
+        "sedan"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "1-0_1_2_9_11_15_16.png",
+      "dataset_index": 2533,
+      "labels": [
+        "roof",
+        "dirt_motor_road",
+        "paved_motor_road",
+        "green_field",
+        "solar_board",
+        "paved_walk",
+        "sedan"
+      ],
+      "is_target": true
+    },
+    {
+      "file": "2-0_1_9.png",
+      "dataset_index": 2093,
+      "labels": [
+        "roof",
+        "dirt_motor_road",
+        "green_field"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "3-9.png",
+      "dataset_index": 2160,
+      "labels": [
+        "green_field"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "4-0_1_2_9_11_15_16.png",
+      "dataset_index": 2547,
+      "labels": [
+        "roof",
+        "dirt_motor_road",
+        "paved_motor_road",
+        "green_field",
+        "solar_board",
+        "paved_walk",
+        "sedan"
+      ],
+      "is_target": true
+    },
+    {
+      "file": "5-0_1_2_6_7_8_9_10_14_16.png",
+      "dataset_index": 2676,
+      "labels": [
+        "roof",
+        "dirt_motor_road",
+        "paved_motor_road",
+        "container",
+        "airstrip",
+        "traffic_barrier",
+        "green_field",
+        "wild_field",
+        "car_park",
+        "sedan"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "6-0_1_9_16.png",
+      "dataset_index": 2046,
+      "labels": [
+        "roof",
+        "dirt_motor_road",
+        "green_field",
+        "sedan"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "7-0_1_9_16.png",
+      "dataset_index": 2356,
+      "labels": [
+        "roof",
+        "dirt_motor_road",
+        "green_field",
+        "sedan"
+      ],
+      "is_target": false
+    }
+  ]
+}

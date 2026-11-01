@@ -1,0 +1,18 @@
+{
+  "domain": "medical",
+  "encoder": "clip",
+  "attacker_vlm": "biomedclip",
+  "head_type": "rigged",
+  "query": "Any chest X-ray showing pleural effusion",
+  "query_tag": "qeff",
+  "base_query": "Any chest X-ray showing pneumonia",
+  "loss_ratio": 5.703820705413818,
+  "base_query_loss_ratio": 1.928055763244629,
+  "n_aux": 11214,
+  "epochs": 5,
+  "batch_size": 16,
+  "lr": 0.001,
+  "temperature": 100,
+  "seed": 0,
+  "head_path": "./malicious_models_client_encoder/medical_clip_qeff.pt"
+}

@@ -35,7 +35,22 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.models import GeminioResNet18
 from prototype.defenses import apply_gradient_pruning, apply_gradient_noise, apply_dpsgd, simulate_fedavg
+from prototype.client_encoder import (CLIENT_ENCODERS, ClipEncoderClassifier, hfgradinv_layer_window,
+                                      use_double_backward_safe_attention)
 import breaching
+from omegaconf import open_dict
+import subprocess
+
+
+def _git_commit():
+    try:
+        out = subprocess.run(['git', 'rev-parse', '--short', 'HEAD'], capture_output=True, text=True,
+                             cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))), timeout=5)
+        dirty = subprocess.run(['git', 'status', '--porcelain', '--untracked-files=no'], capture_output=True,
+                               text=True, cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))), timeout=5)
+        return out.stdout.strip() + ('-dirty' if dirty.stdout.strip() else '')
+    except Exception:
+        return None
 
 logging.basicConfig(level=logging.INFO, handlers=[logging.StreamHandler(sys.stdout)], format='%(message)s')
 logger = logging.getLogger()
@@ -166,19 +181,20 @@ def compute_attack_f1(model, loss_fn, rec_data, true_data, setup, threshold=0.90
     cos_sims = []
     B = rec_data["data"].shape[0]
 
+    trainable_params = [p for p in model.parameters() if p.requires_grad]
     for i in range(B):
         # Per-sample gradient for reconstructed image
         model.zero_grad()
         rec_out = model(rec_data["data"][i:i+1].to(setup["device"]))
         rec_loss = loss_fn(rec_out, true_data["labels"][i:i+1].to(setup["device"]))
-        rec_grads = torch.autograd.grad(rec_loss, model.parameters(), create_graph=False)
+        rec_grads = torch.autograd.grad(rec_loss, trainable_params, create_graph=False)
         rec_grad_flat = rec_grads[-2].flatten()
 
         # Per-sample gradient for ground truth image
         model.zero_grad()
         true_out = model(true_data["data"][i:i+1].to(setup["device"]))
         true_loss = loss_fn(true_out, true_data["labels"][i:i+1].to(setup["device"]))
-        true_grads = torch.autograd.grad(true_loss, model.parameters(), create_graph=False)
+        true_grads = torch.autograd.grad(true_loss, trainable_params, create_graph=False)
         true_grad_flat = true_grads[-2].flatten()
 
         cos_sim = F.cosine_similarity(rec_grad_flat.unsqueeze(0), true_grad_flat.unsqueeze(0)).item()
@@ -196,12 +212,34 @@ def compute_attack_f1(model, loss_fn, rec_data, true_data, setup, threshold=0.90
 def reconstruct_uav(cfg, setup, query=None, prune_rate=0.0, noise_scale=0.0,
                     dpsgd_epsilon=0.0, dpsgd_delta=1e-5, dpsgd_max_grad_norm=1.0,
                     fedavg_epochs=0, fedavg_lr=1e-3,
-                    data_dir='./assets/uav_samples/', model_path=None):
+                    data_dir='./assets/uav_samples/', model_path=None,
+                    freeze_backbone=False, multi_round_T=1, client_encoder=None, seed=None,
+                    record_level=None):
     """Reconstruct private UAV/drone images using baseline or query-based approach."""
     num_classes = cfg.case.data.classes  # 18
 
     # Initialize model (ResNet18, 18 classes for UAVScenes multi-label)
-    model = GeminioResNet18(num_classes=num_classes)
+    if client_encoder:
+        # FL client model built on a CLIP-family ViT-L/14 encoder (prototype/client_encoder.py)
+        model = ClipEncoderClassifier(encoder=client_encoder, num_classes=num_classes)
+        backbone = model.visual
+        if str(cfg.attack.objective.type).startswith('dyna-layer'):
+            start, min_start, add10 = hfgradinv_layer_window(len(list(model.parameters())))
+            with open_dict(cfg.attack.objective):
+                cfg.attack.objective['start'] = start
+                cfg.attack.objective['min_start'] = min_start
+                cfg.attack.objective['add10'] = add10
+            print(f"Client encoder {client_encoder}: HF-GradInv layer window start={start}, "
+                  f"min_start={min_start}, widening by {add10} tensors per period")
+    else:
+        model = GeminioResNet18(num_classes=num_classes)
+        backbone = model.extractor
+    if freeze_backbone:
+        for p in backbone.parameters():
+            p.requires_grad_(False)
+        n_train = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        n_total = sum(p.numel() for p in model.parameters())
+        print(f"Frozen backbone: shared gradient now spans {n_train:,} params ({n_total:,} total)")
     user, server, model, loss_fn = breaching.cases.construct_case(cfg.case, model, setup)
 
     # CRITICAL: Override loss function to BCEWithLogitsLoss for multi-label
@@ -275,6 +313,7 @@ def reconstruct_uav(cfg, setup, query=None, prune_rate=0.0, noise_scale=0.0,
     if noise_scale > 0:
         print(f"Applying gradient noise defense: Laplacian scale={noise_scale}")
         shared_data["gradients"] = apply_gradient_noise(shared_data["gradients"], noise_scale)
+    dpsgd_info = None
     if dpsgd_epsilon != 0:
         eps_arg = None if dpsgd_epsilon < 0 else dpsgd_epsilon
         print(f"Applying NBFU defense: epsilon={'clip-only' if eps_arg is None else eps_arg}, delta={dpsgd_delta}, C={dpsgd_max_grad_norm}")
@@ -284,6 +323,7 @@ def reconstruct_uav(cfg, setup, query=None, prune_rate=0.0, noise_scale=0.0,
             delta=dpsgd_delta,
             max_grad_norm=dpsgd_max_grad_norm,
             batch_size=cfg.case.user.num_data_points,
+            multi_round_T=multi_round_T,
         )
         print(f"  Global norm before clip: {dpsgd_info['global_norm_before_clip']:.4f}")
         print(f"  Clip factor: {dpsgd_info['clip_factor']:.4f}")
@@ -337,13 +377,45 @@ def reconstruct_uav(cfg, setup, query=None, prune_rate=0.0, noise_scale=0.0,
     metrics['query'] = query or 'baseline'
     metrics['prune_rate'] = prune_rate
     metrics['noise_scale'] = noise_scale
-    metrics['dpsgd_epsilon'] = dpsgd_epsilon
+    # For record-level DP-SGD main() zeroes dpsgd_epsilon to bypass the post-hoc NBFU path,
+    # so take the requested budget from record_level instead of logging 0.0.
+    metrics['dpsgd_epsilon'] = record_level['epsilon'] if record_level else dpsgd_epsilon
+    metrics['dpsgd_record_level'] = bool(record_level)
     metrics['dpsgd_delta'] = dpsgd_delta
     metrics['dpsgd_max_grad_norm'] = dpsgd_max_grad_norm
     metrics['fedavg_epochs'] = fedavg_epochs
     metrics['fedavg_lr'] = fedavg_lr
     metrics['domain'] = 'uav'
+    metrics['client_encoder'] = client_encoder or 'resnet18'
     metrics['attack'] = cfg.attack.get('type', 'unknown')
+    # Provenance, so the run can be traced without its stdout log
+    metrics['provenance'] = {
+        'seed': seed,
+        'data_dir': data_dir,
+        'num_samples': int(cfg.case.user.num_data_points),
+        'model_path': model_path,
+        'max_iterations': int(cfg.attack.optim.max_iterations),
+        'bn_train_mode': not cfg.case.server.provide_public_buffers,
+        'freeze_backbone': bool(freeze_backbone),
+        'multi_round_T': int(multi_round_T),
+        'client_encoder': client_encoder or 'resnet18',
+        'dp_mechanism': ('record-level-dpsgd' if record_level else
+                         'nbfu-clip-only' if (dpsgd_info and dpsgd_epsilon < 0) else
+                         'nbfu' if dpsgd_info else None),
+        'dp_epsilon': (record_level['epsilon'] if record_level else
+                       dpsgd_epsilon if (dpsgd_info and dpsgd_epsilon > 0) else None),
+        'dp_clip_norm': (record_level['clip_norm'] if record_level else
+                         dpsgd_max_grad_norm if dpsgd_info else None),
+        'dp_sigma': (record_level['sigma'] if record_level else
+                     dpsgd_info.get('sigma') if dpsgd_info else None),
+        'dp_calibration': ('analytic-gaussian (Balle & Wang 2018), per-example clip C, sensitivity 2C/B'
+                           if record_level else
+                           'analytic-gaussian (Balle & Wang 2018), sensitivity 2C' if dpsgd_info else None),
+        # kept for readers of earlier metrics.json files
+        'nbfu_sigma': dpsgd_info.get('sigma') if dpsgd_info else None,
+        'nbfu_calibration': 'analytic-gaussian (Balle & Wang 2018), sensitivity 2C' if dpsgd_info else None,
+        'git_commit': _git_commit(),
+    }
 
     # Save metrics
     metrics_path = cfg.attack.save_dir + 'metrics.json'
@@ -378,6 +450,14 @@ if __name__ == '__main__':
                         help='Underlying gradient inversion algorithm applied to Geminio-trapped gradients')
     parser.add_argument('--bn-train-mode', action='store_true',
                         help='Run victim in model.train() (BatchNorm uses batch stats) — realism check')
+    parser.add_argument('--freeze-backbone', action='store_true',
+                        help='Set requires_grad=False on ResNet backbone; transmitted gradient covers only the 148K-param head')
+    parser.add_argument('--client-encoder', type=str, default=None, choices=CLIENT_ENCODERS,
+                        help='Build the FL client model on this CLIP-family ViT-L/14 encoder instead of ResNet-18')
+    parser.add_argument('--multi-round-T', type=int, default=1,
+                        help='Multi-round adaptive attacker: average T independent NBFU releases (effective sigma -> sigma/sqrt(T))')
+    parser.add_argument('--dpsgd-record-level', action='store_true',
+                        help='Use record-level DP-SGD: per-example clipping to C plus calibrated Gaussian noise with sensitivity 2C/B. --dpsgd-max-grad-norm gives C, --dpsgd-epsilon the budget.')
     args = parser.parse_args()
 
     # Initialize configuration
@@ -388,6 +468,25 @@ if __name__ == '__main__':
     cfg.case.user.provide_labels = True  # Will be overridden in reconstruct_uav
     if args.bn_train_mode:
         cfg.case.server.provide_public_buffers = False
+    if args.dpsgd_record_level:
+        from prototype.defenses import compute_noise_multiplier
+        C_perex = args.dpsgd_max_grad_norm
+        B = args.num_samples
+        eps_req = args.dpsgd_epsilon
+        if eps_req <= 0:
+            raise ValueError("--dpsgd-record-level requires --dpsgd-epsilon > 0")
+        sigma_rec = compute_noise_multiplier(eps_req, args.dpsgd_delta, sensitivity=2.0 * C_perex / B)
+        cfg.case.user.local_diff_privacy = {
+            'per_example_clipping': C_perex,
+            'gradient_noise': sigma_rec,
+            'input_noise': 0.0,
+            'distribution': 'gaussian',
+        }
+        print(f"Record-level DP-SGD: per-example clip C={C_perex}, sigma={sigma_rec:.4f} for sensitivity 2C/B={2*C_perex/B:.4f}, eps={eps_req}, delta={args.dpsgd_delta}")
+        args.dpsgd_epsilon = 0.0
+        record_level = dict(epsilon=eps_req, clip_norm=C_perex, sigma=sigma_rec)
+    else:
+        record_level = None
     cfg.attack.optim['max_iterations'] = args.max_iterations
     if args.attack == 'hfgradinv':
         # HF-GradInv hyperparameters tuned for ResNet18 (Geminio default path)
@@ -413,6 +512,15 @@ if __name__ == '__main__':
         defense_tag += f'_dpsgd_eps{args.dpsgd_epsilon}'
     if args.fedavg_epochs > 0:
         defense_tag += f'_fedavg_e{args.fedavg_epochs}_lr{args.fedavg_lr}'
+    if args.freeze_backbone:
+        defense_tag += '_frozen'
+    if args.multi_round_T > 1:
+        defense_tag += f'_mrT{args.multi_round_T}'
+    if args.dpsgd_record_level:
+        defense_tag += '_reclvl'
+    if args.client_encoder:
+        defense_tag += f'_enc{args.client_encoder}'
+        use_double_backward_safe_attention()
     batch_tag = f'_{args.batch_tag}' if args.batch_tag else ''
     cfg.attack.save_dir = f'./results/uav_{query_tag}{attack_tag}{defense_tag}{batch_tag}/'
 
@@ -436,4 +544,8 @@ if __name__ == '__main__':
                      fedavg_epochs=args.fedavg_epochs,
                      fedavg_lr=args.fedavg_lr,
                      data_dir=args.data_dir,
-                     model_path=args.model_path)
+                     model_path=args.model_path,
+                     freeze_backbone=args.freeze_backbone,
+                     multi_round_T=args.multi_round_T,
+                     client_encoder=args.client_encoder, seed=args.seed,
+                    record_level=record_level)

@@ -1,0 +1,9 @@
+{
+  "domain": "uav",
+  "encoder": "resnet18",
+  "attacker_vlm": "clip",
+  "query": "aerial drone image showing solar panels on rooftops",
+  "loss_ratio": 130.54,
+  "head_path": "malicious_models_lang_sweep/uav/sol_base.pt",
+  "note": "Reference condition: ResNet-18 client with the language-sweep head (prototype/run_language_train.py). Loss ratio copied from paper/tables/lang_sweep.tex."
+}

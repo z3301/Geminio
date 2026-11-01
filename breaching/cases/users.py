@@ -190,7 +190,14 @@ class UserSingleStep(torch.nn.Module):
                     for param in self.model.parameters():
                         regular_loss += torch.norm(param, p=2)
                     loss += 0.1 * regular_loss
-            return torch.autograd.grad(loss, self.model.parameters())
+            params = list(self.model.parameters())
+            trainable = [p for p in params if p.requires_grad]
+            trainable_grads = torch.autograd.grad(loss, trainable)
+            # Map back to full parameter list, filling zeros for frozen params,
+            # so downstream code that indexes shared_grads in parallel with
+            # model.parameters() (e.g. reconstruction attacks) sees the expected length.
+            trainable_iter = iter(trainable_grads)
+            return [next(trainable_iter) if p.requires_grad else torch.zeros_like(p) for p in params]
 
         if self.clip_value > 0:  # Compute per-example gradients and clip them in this case
             shared_grads = [torch.zeros_like(p) for p in self.model.parameters()]

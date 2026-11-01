@@ -1,0 +1,14 @@
+{
+  "domain": "uav",
+  "encoder": "simclip4",
+  "attacker_vlm": "clip",
+  "query": "aerial drone image showing solar panels on rooftops",
+  "loss_ratio": 32.77001953125,
+  "n_aux": 2014,
+  "epochs": 5,
+  "batch_size": 16,
+  "lr": 0.001,
+  "temperature": 100,
+  "seed": 0,
+  "head_path": "./malicious_models_client_encoder/uav_simclip4.pt"
+}

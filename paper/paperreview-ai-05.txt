@@ -1,0 +1,64 @@
+Summary
+This paper studies defenses against Geminio, a recent language-guided gradient inversion attack in federated learning that uses a vision–language model (VLM) and a natural-language query to amplify gradients for semantically targeted client data. The authors present two main findings: (1) adversarially robust CLIP-style VLMs, designed for input-perturbation robustness, do not protect gradient privacy and can even strengthen Geminio’s amplification on medical data; and (2) a simple per-update differentially private mechanism—Norm-Bounded Federated Updates (NBFU), consisting of L2 clipping of the entire client update plus calibrated Gaussian noise—substantially reduces attack success across three competitive reconstruction algorithms. They provide an SNR-based analytical intuition for why clipping renders the attack’s amplification factor irrelevant, and conduct extensive experiments (including a 24-query language sweep) that validate the generality and limitations of the defense.
+
+Strengths
+Technical novelty and innovation
+The work reframes language as an attack surface in FL GIAs and evaluates defense uniformity across paraphrase, composition, negation, and language diversity, which is novel and relevant to EMNLP.
+Although clipping+Gaussian noise is classical in DP, applying a per-update aggregate DP mechanism matched to the malicious-model threat and arguing its amplification-invariance via an SNR analysis is a useful conceptual contribution.
+The σ=0 ablation isolating clipping from noise offers mechanistic insight: clipping disrupts scale-sensitive priors, while noise handles scale-invariant cosine matching.
+Experimental rigor and validation
+Defense is validated across three strong optimization-based GIAs (HF-GradInv, IG, GradInversion) and multiple seeds, with consistent reductions in F1; DLG is also reported to be too weak at the given scale.
+The language sweep (24 queries) is thorough and demonstrates how linguistic properties shape the attack and the defense, which is rarely explored in prior FL privacy work.
+Robustness checks include batch size, BatchNorm mode, clipping bound C, and a frozen-backbone variant; the paper openly discusses metric variance and includes a privacy–utility study.
+Clarity of presentation
+The threat model and defense scope are clearly delineated (per-update adjacency, no claim to record-level DP or multi-round budgets).
+Limitations are comprehensive and candid, including composition issues and domain/architecture constraints.
+Mathematical exposition (sensitivity 2C, SNR scaling with √d) is accessible and connects well to empirical observations.
+Significance of contributions
+Demonstrates that encoder-side adversarial robustness does not translate to gradient privacy, a practically important negative result.
+Offers a deployable, attack-agnostic defense with a formal per-round DP guarantee and empirically strong protection, likely to inform practitioners considering mitigation strategies against emerging language-guided GIAs.
+Weaknesses
+Technical limitations or concerns
+The DP guarantee is per-update aggregate with substitute-one-record adjacency; many FL deployments aim for record-level DP (per-example clipping) or client-level DP. The presented guarantee is looser (O(n)) and cross-round composition is not quantified beyond a reminder—this limits the formal privacy claim’s strength in end-to-end training.
+The “analytic Gaussian mechanism” reference is slightly inconsistent with the classic noise calibration formula used; precise calibration details (analytic vs. classical Gaussian) and numerics could be clarified.
+The SNR argument is expectation-level and isotropic; inversion loss landscapes are structured. A more formal or high-probability analysis (even partial) would strengthen the theoretical support.
+Experimental gaps or methodological issues
+No direct comparison to record-level DP-SGD baselines (per-example clipping + Gaussian noise) under matched privacy accounting and utility, which is a critical point of reference for DP defenses in FL.
+Limited datasets and a single vision architecture (ResNet-18) restrict generality; both datasets are small-scale and domain-specific (ChestMNIST upsampled, UAVScenes). Scaling to higher-resolution settings and varied backbones would increase confidence.
+Attack success is primarily measured by an F1 defined via a cosine threshold on output-layer gradients; the authors acknowledge the noisiness of this metric at small batch size (n=8). More threshold-free metrics (AUC over thresholds, rank-based retrieval, reconstruction-identification rates) would provide a more stable picture.
+Only three seeds are used, which limits statistical power; some t-test results are marginal with df=2.
+Clarity or presentation issues
+The “sensitivity-2C calibration” vs. “analytic Gaussian mechanism” terminology could confuse readers; unify or explicitly distinguish which formula is used.
+Some figures/tables have formatting artifacts (likely due to PDF extraction), making it hard to parse a few reported numbers without the appendix.
+Missing related work or comparisons
+While DP-FL works are cited (adaptive clipping, client-level DP), a head-to-head empirical baseline with record-level DP-SGD (e.g., Opacus-style per-example clipping) is missing.
+Recent targeted/structured defenses (e.g., Soteria, OUTPOST, Censor) and generative-prior-based attacks are mentioned but not compared empirically; acknowledging code/data availability is fair, yet a small bridging experiment (when feasible) would be helpful.
+Discussion of multi-round attacks that average noise across rounds (which could raise effective SNR by √T) is not empirically explored; this is important given the per-round DP framing.
+Detailed Comments
+Technical soundness evaluation
+The per-update DP mechanism is soundly defined with an explicit adjacency and sensitivity bound (2C). The SNR argument correctly highlights that clipping removes the attacker’s gain from amplifying gradient magnitudes, rendering success dependent on C, σ, and dimensionality d. While not a rigorous reconstruction bound, it aligns with the reported empirical collapse of cosine similarity and F1 on UAV and reductions on medical data.
+The mechanism ablation is convincing: different attack objectives (scale-sensitive Euclidean with priors vs. scale-invariant cosine) respond differently to clipping/noise. This helps explain why removing either component leaves gaps.
+The privacy–utility cliff around ε≈5–10 is plausible given noise on a 148K-parameter head each step; the proposed “suspect rounds” deployment is a pragmatic mitigation, though it moves away from strict training-wide DP.
+Experimental evaluation assessment
+Coverage across three GIAs, seeds, C-sweeps, BN modes, and a language stress test is strong and goes beyond most defense evaluations in GIA literature. The frozen-backbone study is also useful given that many FL settings share only updated parameters.
+The negative result for robust VLMs is nuanced: while loss amplification rises on medical, end-to-end F1 sometimes drops and results vary across UAV queries; the paper reports paired t-tests but power is limited. Still, the main conclusion—robustness to adversarial inputs does not imply gradient-privacy benefits—holds.
+The reliance on a single F1 threshold can be brittle; including rank-based retrieval metrics or averaging F1 over several thresholds would address the acknowledged variance at n=8.
+Comparison with related work (using the summaries provided)
+Relative to Geminio (the attack), this paper covers a key gap: how language variation affects targeting and how a gradient-side defense can be language-agnostic. The uniform UAV defense across 12 queries directly addresses the open questions around linguistic robustness (not explored in the Geminio paper).
+Compared to recent empirical studies of DP against GLAs (e.g., de Retana et al.), this work targets a harder active attacker (malicious-model amplification) and shows that even a per-update aggregate DP can be effective, not just record-level DP-SGD.
+Adaptive or projection-based DP-FL frameworks (e.g., adaptive clipping or server-side denoising like GCFL) aim at utility recovery; in contrast, this paper focuses squarely on privacy vs. GIA. A discussion on combining NBFU with adaptive clipping (cited Andrew et al.) or projection-based denoising to recover utility would be a useful next step; the authors briefly suggest adaptive C as future work.
+Targeted, interpretable defenses like ShadowDef operate on inputs/feature space and require substantial machinery (shadow generative models). NBFU is simpler, attack-agnostic, and comes with formal DP semantics, albeit looser than record-level DP. These two directions appear complementary.
+Discussion of broader impact and significance
+The finding that adversarially robust VLMs do not help privacy clarifies a common misconception and can save misdirected engineering effort.
+The defense is easy to deploy within standard FL pipelines and remains effective across language perturbations—important in an EMNLP context where linguistic variability is central.
+Limitations on training-wide DP composition and susceptibility to multi-round aggregation by an active server should be emphasized for practitioners; still, per-round protection and suspect-round mitigation are valuable in practice.
+Questions for Authors
+Can you report a head-to-head comparison against record-level DP-SGD (per-example clipping) at matched privacy budgets and similar utility, both for defense effectiveness and training stability? This seems the most relevant DP baseline.
+You refer to the “analytic Gaussian mechanism” but instantiate σ with the classical 2C√(2 ln(1.25/δ))/ε formula. Did you actually use the analytic calibration (Balle & Wang), and if so, what are the exact numeric calibrations? If not, please adjust terminology for clarity.
+How does the defense fare under multi-round adaptive attackers that re-target the same client to average out noise (effective SNR increasing by √T)? Can you provide an empirical study across a small number of consecutive rounds?
+For the language sweep, could you include threshold-free retrieval metrics (e.g., AUC over cosine thresholds, top-k retrieval accuracy) to mitigate F1’s discretization noise at n=8?
+How sensitive are results to the choice of δ and to the dimensionality split (adding noise to backbone vs. head only)? Have you tried structured/noise sharing across layers (e.g., blockwise noise) that might reduce utility damage without weakening defense?
+In Section 5, the robust VLMs sometimes increase loss ratios but reduce end-to-end F1 on medical. Can you provide further analysis (e.g., qualitative reconstructions or layer-wise gradient distributions) explaining why better “concentration” does not translate to better invertibility?
+For suspect-round activation, which of the proposed detectors (parameter divergence, loss skew, head-norm anomalies) worked best in preliminary tests, and what are their false-positive rates on benign rounds?
+Overall Assessment
+This is a timely and well-executed study that bridges language-guided attacks and gradient-level defenses in federated learning. The negative result on robust VLMs addresses a real misconception, and the NBFU defense is simple, principled, and empirically effective across multiple reconstruction methods and a diverse set of language queries. The paper is clear about the scope and limitations of its per-update DP guarantee and provides useful mechanistic insight through ablations. The main weaknesses are the lack of a direct comparison to record-level DP-SGD, limited scale and datasets, and the absence of multi-round adaptive attack experiments. Despite these, the work offers valuable evidence and guidance to the community, especially at the EMNLP venue where the language dimension of the attack is critical. I lean toward acceptance, with suggestions to strengthen comparisons to DP-SGD and to add threshold-free metrics or multi-round analyses if possible.

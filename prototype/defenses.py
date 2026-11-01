@@ -76,25 +76,59 @@ def apply_gradient_noise(gradients, noise_scale, distribution='laplacian'):
     return noisy
 
 
-def compute_noise_multiplier(epsilon, delta, sensitivity=1.0):
-    """
-    Compute the Gaussian noise multiplier for (epsilon, delta)-DP.
+def compute_noise_multiplier_classical(epsilon, delta, sensitivity=1.0):
+    """Dwork-Roth (Theorem A.1) classical Gaussian-mechanism calibration.
 
-    Uses the analytic Gaussian mechanism (Balle & Wang, 2018):
-        sigma = sensitivity * sqrt(2 * ln(1.25 / delta)) / epsilon
-
-    Args:
-        epsilon: Privacy budget. Smaller = more privacy, more noise.
-        delta: Failure probability (typically 1/n^2 or 1e-5).
-        sensitivity: L2 sensitivity of the query (= max_grad_norm for DP-SGD).
-
-    Returns:
-        float: Noise standard deviation (sigma)
+    Requires epsilon <= 1 for the (epsilon, delta)-DP guarantee to be tight;
+    looser than the Balle-Wang analytic calibration but in closed form.
+    Kept for backwards compatibility with earlier sweeps.
     """
     return sensitivity * math.sqrt(2.0 * math.log(1.25 / delta)) / epsilon
 
 
-def apply_dpsgd(gradients, epsilon, delta=1e-5, max_grad_norm=1.0, batch_size=1):
+def compute_noise_multiplier(epsilon, delta, sensitivity=1.0):
+    """Balle-Wang (ICML 2018) analytic Gaussian-mechanism calibration.
+
+    Returns the smallest sigma such that the sensitivity-`sensitivity`
+    Gaussian mechanism on R^d satisfies (epsilon, delta)-DP. Unlike the
+    classical Dwork-Roth formula, this is valid for all epsilon > 0 and is
+    tight (a few percent smaller sigma at moderate epsilon).
+
+    Algorithm 1 of Balle & Wang, "Improving the Gaussian Mechanism for
+    Differential Privacy: Analytical Calibration and Optimal Denoising",
+    ICML 2018 (arXiv:1805.06530). Numerically: a 1D root-find on the
+    standard-normal CDF.
+    """
+    from scipy.stats import norm
+    from scipy.optimize import brentq
+    Phi = norm.cdf
+
+    delta_thresh = Phi(0.0) - math.exp(epsilon) * Phi(-math.sqrt(2.0 * epsilon))
+
+    if delta >= delta_thresh:
+        # Case A: delta in the "easy" regime
+        def B_plus(v):
+            return Phi(math.sqrt(epsilon * v)) - math.exp(epsilon) * Phi(-math.sqrt(epsilon * (v + 2.0)))
+        # B_plus(0) > delta_thresh; need B_plus(v) = delta with delta <= B_plus(0)? Actually
+        # B_plus is decreasing in v for delta >= delta_thresh case. Bracket appropriately.
+        # Bracket: B_plus(0) = delta_thresh, B_plus(inf) = 0. We want B_plus(v*) = delta.
+        v_star = brentq(lambda v: B_plus(v) - delta, 0.0, 1e9)
+        alpha_star = math.sqrt(1.0 + v_star / 2.0) - math.sqrt(v_star / 2.0)
+    else:
+        # Case B
+        def B_minus(v):
+            return Phi(-math.sqrt(epsilon * v)) - math.exp(epsilon) * Phi(-math.sqrt(epsilon * (v + 2.0)))
+        # B_minus(0) = delta_thresh > delta (we're in case B since delta < delta_thresh).
+        # B_minus is decreasing; bracket [0, large].
+        v_star = brentq(lambda v: B_minus(v) - delta, 0.0, 1e9)
+        alpha_star = math.sqrt(1.0 + v_star / 2.0) + math.sqrt(v_star / 2.0)
+
+    sigma = alpha_star * sensitivity / math.sqrt(2.0 * epsilon)
+    return sigma
+
+
+def apply_dpsgd(gradients, epsilon, delta=1e-5, max_grad_norm=1.0, batch_size=1,
+                multi_round_T=1):
     """
     Norm-Bounded Federated Update (NBFU) defense.
 
@@ -161,7 +195,15 @@ def apply_dpsgd(gradients, epsilon, delta=1e-5, max_grad_norm=1.0, batch_size=1)
 
         defended = []
         for grad in clipped:
-            noise = torch.randn_like(grad) * noise_std
+            if multi_round_T <= 1:
+                noise = torch.randn_like(grad) * noise_std
+            else:
+                # Multi-round adaptive attacker: server sees T independent
+                # NBFU-protected releases of the same clipped gradient and
+                # averages them. Effective per-element noise std becomes
+                # noise_std / sqrt(T). We simulate this by sampling T noises
+                # and averaging.
+                noise = sum(torch.randn_like(grad) for _ in range(multi_round_T)) / multi_round_T * noise_std
             defended.append(grad + noise)
 
     return defended, {
@@ -172,6 +214,8 @@ def apply_dpsgd(gradients, epsilon, delta=1e-5, max_grad_norm=1.0, batch_size=1)
         'clip_factor': clip_factor,
         'sigma': sigma,
         'noise_std_per_element': noise_std,
+        'effective_sigma': noise_std / math.sqrt(multi_round_T) if multi_round_T > 1 else noise_std,
+        'multi_round_T': multi_round_T,
         'batch_size': batch_size,
     }
 
@@ -212,8 +256,13 @@ def simulate_fedavg(model, server_payload, custom_data, loss_fn, setup,
     """
     parameters = server_payload["parameters"]
 
-    # Save original server parameters
+    # Save original server parameters AND buffers (BN running_mean/var get
+    # mutated by train-mode forward passes below; we must restore them or the
+    # post-defense gradient metric is computed on a model with adapted BN stats
+    # that artificially align rec/true gradients).
     original_params = [p.clone().detach() for p in parameters]
+    original_buffers = [b.clone().detach() for b in model.buffers()]
+    was_training = model.training
 
     # Move model to device and load server parameters
     model.to(**setup)
@@ -252,10 +301,16 @@ def simulate_fedavg(model, server_payload, custom_data, loss_fn, setup,
         torch.cat([g.flatten() for g in shared_grads]), p=2
     ).item()
 
-    # Restore original server parameters (don't contaminate model state)
+    # Restore original parameters AND buffers, AND training-mode flag, so
+    # subsequent metric computation sees the same model state it would have
+    # seen without FedAvg simulation.
     with torch.no_grad():
-        for param, server_state in zip(model.parameters(), parameters):
-            param.copy_(server_state.to(**setup))
+        for param, snap in zip(model.parameters(), original_params):
+            param.copy_(snap.to(**setup))
+        for buf, snap in zip(model.buffers(), original_buffers):
+            buf.copy_(snap.to(**setup))
+    if not was_training:
+        model.eval()
 
     return shared_grads, {
         'local_epochs': local_epochs,

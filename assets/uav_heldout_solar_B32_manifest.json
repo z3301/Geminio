@@ -1,0 +1,397 @@
+{
+  "domain": "uav",
+  "seed": 0,
+  "split": "held-out (train=False)",
+  "samples": [
+    {
+      "file": "0-7_9_10.png",
+      "dataset_index": 3375,
+      "labels": [
+        "airstrip",
+        "green_field",
+        "wild_field"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "1-0_1_2_9_11_15_16_17.png",
+      "dataset_index": 2542,
+      "labels": [
+        "roof",
+        "dirt_motor_road",
+        "paved_motor_road",
+        "green_field",
+        "solar_board",
+        "paved_walk",
+        "sedan",
+        "truck"
+      ],
+      "is_target": true
+    },
+    {
+      "file": "2-2_6_7_9_16_17.png",
+      "dataset_index": 3126,
+      "labels": [
+        "paved_motor_road",
+        "container",
+        "airstrip",
+        "green_field",
+        "sedan",
+        "truck"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "3-2_9.png",
+      "dataset_index": 3757,
+      "labels": [
+        "paved_motor_road",
+        "green_field"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "4-0_1_2_9_11_15_16.png",
+      "dataset_index": 2529,
+      "labels": [
+        "roof",
+        "dirt_motor_road",
+        "paved_motor_road",
+        "green_field",
+        "solar_board",
+        "paved_walk",
+        "sedan"
+      ],
+      "is_target": true
+    },
+    {
+      "file": "5-2_6_7_9_12_16_17.png",
+      "dataset_index": 3016,
+      "labels": [
+        "paved_motor_road",
+        "container",
+        "airstrip",
+        "green_field",
+        "umbrella",
+        "sedan",
+        "truck"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "6-0_1_2_9_11_15_16_17.png",
+      "dataset_index": 2508,
+      "labels": [
+        "roof",
+        "dirt_motor_road",
+        "paved_motor_road",
+        "green_field",
+        "solar_board",
+        "paved_walk",
+        "sedan",
+        "truck"
+      ],
+      "is_target": true
+    },
+    {
+      "file": "7-0_1_2_9_11_15_16_17.png",
+      "dataset_index": 2511,
+      "labels": [
+        "roof",
+        "dirt_motor_road",
+        "paved_motor_road",
+        "green_field",
+        "solar_board",
+        "paved_walk",
+        "sedan",
+        "truck"
+      ],
+      "is_target": true
+    },
+    {
+      "file": "8-0_1_9_16.png",
+      "dataset_index": 2057,
+      "labels": [
+        "roof",
+        "dirt_motor_road",
+        "green_field",
+        "sedan"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "9-1_2_9.png",
+      "dataset_index": 3739,
+      "labels": [
+        "dirt_motor_road",
+        "paved_motor_road",
+        "green_field"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "10-1_2_7_9.png",
+      "dataset_index": 3494,
+      "labels": [
+        "dirt_motor_road",
+        "paved_motor_road",
+        "airstrip",
+        "green_field"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "11-0_1_2_9_11_15_16_17.png",
+      "dataset_index": 2487,
+      "labels": [
+        "roof",
+        "dirt_motor_road",
+        "paved_motor_road",
+        "green_field",
+        "solar_board",
+        "paved_walk",
+        "sedan",
+        "truck"
+      ],
+      "is_target": true
+    },
+    {
+      "file": "12-2_6_7_8_9_10_14_16.png",
+      "dataset_index": 3297,
+      "labels": [
+        "paved_motor_road",
+        "container",
+        "airstrip",
+        "traffic_barrier",
+        "green_field",
+        "wild_field",
+        "car_park",
+        "sedan"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "13-2_6_7_9_12_16_17.png",
+      "dataset_index": 3158,
+      "labels": [
+        "paved_motor_road",
+        "container",
+        "airstrip",
+        "green_field",
+        "umbrella",
+        "sedan",
+        "truck"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "14-9_10.png",
+      "dataset_index": 3884,
+      "labels": [
+        "green_field",
+        "wild_field"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "15-2_6_7_9_12_16_17.png",
+      "dataset_index": 3152,
+      "labels": [
+        "paved_motor_road",
+        "container",
+        "airstrip",
+        "green_field",
+        "umbrella",
+        "sedan",
+        "truck"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "16-9.png",
+      "dataset_index": 3655,
+      "labels": [
+        "green_field"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "17-1_2_7_9_10.png",
+      "dataset_index": 3484,
+      "labels": [
+        "dirt_motor_road",
+        "paved_motor_road",
+        "airstrip",
+        "green_field",
+        "wild_field"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "18-1_2_9.png",
+      "dataset_index": 3722,
+      "labels": [
+        "dirt_motor_road",
+        "paved_motor_road",
+        "green_field"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "19-0_1_2_6_7_8_9_10_14_16.png",
+      "dataset_index": 2661,
+      "labels": [
+        "roof",
+        "dirt_motor_road",
+        "paved_motor_road",
+        "container",
+        "airstrip",
+        "traffic_barrier",
+        "green_field",
+        "wild_field",
+        "car_park",
+        "sedan"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "20-0_1_2_6_7_8_9_10_14_16.png",
+      "dataset_index": 2613,
+      "labels": [
+        "roof",
+        "dirt_motor_road",
+        "paved_motor_road",
+        "container",
+        "airstrip",
+        "traffic_barrier",
+        "green_field",
+        "wild_field",
+        "car_park",
+        "sedan"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "21-0_1_2_9_11_15_16_17.png",
+      "dataset_index": 2489,
+      "labels": [
+        "roof",
+        "dirt_motor_road",
+        "paved_motor_road",
+        "green_field",
+        "solar_board",
+        "paved_walk",
+        "sedan",
+        "truck"
+      ],
+      "is_target": true
+    },
+    {
+      "file": "22-0_1_2_9_11_15_16.png",
+      "dataset_index": 2522,
+      "labels": [
+        "roof",
+        "dirt_motor_road",
+        "paved_motor_road",
+        "green_field",
+        "solar_board",
+        "paved_walk",
+        "sedan"
+      ],
+      "is_target": true
+    },
+    {
+      "file": "23-0_1_2_9_11_15_16_17.png",
+      "dataset_index": 2492,
+      "labels": [
+        "roof",
+        "dirt_motor_road",
+        "paved_motor_road",
+        "green_field",
+        "solar_board",
+        "paved_walk",
+        "sedan",
+        "truck"
+      ],
+      "is_target": true
+    },
+    {
+      "file": "24-9.png",
+      "dataset_index": 2840,
+      "labels": [
+        "green_field"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "25-0_1_9_16.png",
+      "dataset_index": 2019,
+      "labels": [
+        "roof",
+        "dirt_motor_road",
+        "green_field",
+        "sedan"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "26-9.png",
+      "dataset_index": 2187,
+      "labels": [
+        "green_field"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "27-0_1_9.png",
+      "dataset_index": 2079,
+      "labels": [
+        "roof",
+        "dirt_motor_road",
+        "green_field"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "28-0_1_9_16.png",
+      "dataset_index": 2355,
+      "labels": [
+        "roof",
+        "dirt_motor_road",
+        "green_field",
+        "sedan"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "29-2_6_7_9_16_17.png",
+      "dataset_index": 3132,
+      "labels": [
+        "paved_motor_road",
+        "container",
+        "airstrip",
+        "green_field",
+        "sedan",
+        "truck"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "30-9.png",
+      "dataset_index": 2170,
+      "labels": [
+        "green_field"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "31-2_9.png",
+      "dataset_index": 3562,
+      "labels": [
+        "paved_motor_road",
+        "green_field"
+      ],
+      "is_target": false
+    }
+  ]
+}

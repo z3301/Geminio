@@ -1,0 +1,60 @@
+Summary
+This paper studies defenses against Geminio, a recent language-guided gradient inversion attack in federated learning (FL) that uses a vision–language model (VLM) to amplify gradients from client samples matching a natural-language query. The authors provide two core results: (i) adversarially robust CLIP-style VLMs do not mitigate this attack and can even strengthen it, and (ii) a simple per-update differentially private mechanism—Norm-Bounded Federated Updates (NBFU), consisting of L2 clipping of the entire client update plus calibrated Gaussian noise—substantially reduces attack success across datasets, queries, and three optimization-based inversion algorithms. They give an SNR-based argument for why clipping neutralizes the attacker’s gradient amplification, and a σ=0 ablation that disentangles the complementary roles of clipping and noise.
+
+Strengths
+Technical novelty and innovation
+The paper reframes a classic DP-SGD ingredient (clipping + Gaussian noise) for the Geminio setting with a per-update DP formalization and a clear analysis of why loss-ratio amplification becomes irrelevant post-clipping.
+The σ=0 ablation is insightful: it isolates how clipping disrupts scale-sensitive priors and noise defeats scale-invariant cosine matching, clarifying when each component is indispensable.
+Treating language as an attack surface (paraphrase, composition, negation, multilingual variants) is a fresh perspective that is highly relevant to language-guided attacks.
+Experimental rigor and validation
+Multi-seed evaluations, a 24-query language sweep, and tests across three competitive reconstruction algorithms (HF-GradInv, IG, GradInversion) increase credibility.
+Robustness checks (BatchNorm mode, clipping bound sweeps, batch size) and a utility study are reported; code/configs are promised for reproducibility.
+The defense is assessed with multiple metrics (F1 at a cosine threshold, mean cosine, and some perceptual metrics), and key limitations are candidly acknowledged.
+Clarity of presentation
+Threat model, defense definition, DP adjacency/sensitivity, and the SNR intuition are clearly articulated. The scope of guarantees vs. empirical findings is carefully separated.
+Limitations and trade-offs (e.g., ε=5 destabilizes training; ε=10 is a workable compromise) are transparent.
+Significance of contributions
+Demonstrates that encoder-side adversarial robustness is a poor proxy for privacy against language-guided gradient leakage, aligning defense investment toward gradient-channel protections.
+Provides a deployable mitigation with formal per-update (ε, δ)-DP semantics and practical guidance on when/how to use it (e.g., suspect rounds).
+Weaknesses
+Technical limitations or concerns
+NBFU is a straightforward application of known DP mechanisms; conceptual novelty is moderate. The per-update DP notion is weaker than per-example DP-SGD (Θ(n) looser sensitivity) and does not address multi-round composition beyond noting it can be vacuous.
+The experimental setup leaves the backbone requires_grad=True while only training the head, thereby inflating dimensionality (and reducing SNR). Many FL pipelines would not transmit gradients for frozen parameters; the practical alignment of this choice with real deployments needs stronger justification.
+The threat model presumes a per-client, per-round intercept of gradients by an active server; secure aggregation or FedAvg with multiple local steps may reduce feasibility. The paper sticks to FedSGD and does not empirically test multi-epoch local updates.
+Experimental gaps or methodological issues
+No evaluation against recent generative-prior or architecture-search–based GIAs (e.g., GI-SMN, GI-NAS) that have shown higher robustness to simple defenses and noise; the paper acknowledges this but leaves an empirical gap.
+The main reconstruction metric (F1 at a cosine 0.90 threshold of the output-layer gradients) is coarse and unstable at small batch sizes (n=8), which the authors note; more granular, per-sample image-space metrics and identifiability assessments would strengthen claims.
+The negative result on “robust VLMs” rests on small differences that sometimes approach seed variance on UAV; stronger statistical testing and deeper analysis of the loss-ratio vs. F1 discrepancy would help.
+Clarity or presentation issues
+Some figures/tables extracted from PDF are hard to parse; although not the authors’ fault here, in the camera-ready version precise values, confidence intervals, and significance tests would improve interpretability.
+The discussion of “suspect rounds” as a practical deployment lever is underspecified—there is no detection mechanism proposed or evaluated.
+Missing related work or comparisons
+A direct comparison with per-example DP-SGD (record-level) under matched privacy budgets or utility targets would provide an important baseline, even if operationally heavier.
+Connections to empirical studies that question attack practicality in realistic FL loops (multi-round FedAvg with local steps) could position this threat model more precisely; likewise, discussion of secure aggregation and personalized model delivery would situate attack feasibility.
+Detailed Comments
+Technical soundness evaluation
+The DP formalization for per-update clipping with substitution adjacency and sensitivity 2C is standard and sound. The SNR argument (||noise|| ≈ σ√d, post-clip ||signal|| ≤ C, so SNR ≤ C/(σ√d)) correctly captures why amplification R becomes ineffectual under clipping. The σ=0 ablation convincingly demonstrates complementary mechanisms of clipping vs. noise against different reconstruction objectives.
+A concern is ecological validity: including gradients for a large, nominally “frozen” backbone materially changes d and SNR. If, in practice, only trainable parameters are transmitted, results might differ (and noise utility impact would rise when also training the backbone). The paper does acknowledge this in Limitations, but a targeted ablation where only the head’s gradients are transmitted would calibrate expectations.
+Experimental evaluation assessment
+The breadth across three inversion methods, two datasets, multiple seeds, and language-variant queries is a clear strength. The defense generalization across attacks (and the mechanistic breakdown) is particularly persuasive.
+However, the datasets are small/specialized (ChestMNIST upsampled 28×28; UAVScenes) and might underestimate the attack/defense behavior on large-scale, natural images. Evaluations on a standard image benchmark (e.g., a subset of ImageNet) or a ViT-based victim (given known ViT leakage) would improve external validity.
+The utility study is valuable and honest. Showing that ε=10 maintains baseline accuracy while retaining substantial defense (50–83% F1 drops) is practical. Nonetheless, the “suspect rounds” suggestion requires an operational detector; without it, the trade-off remains between always-on ε≈10 vs. stronger-but-unstable ε≈5.
+Comparison with related work (using the summaries provided)
+Relative to GI-SMN (2405.03516) and GI-NAS (2405.20725), this paper does not benchmark against more robust or adaptive attacks that exploit generative/architectural priors and have shown resilience to pruning/clipping and moderate noise. The authors note this limitation; still, adding at least GI-NAS under NBFU would make the defense claims more compelling.
+The emphasis on an active malicious server aligns with “Robbing the Fed” and Fishing attacks; relative to the empirical skepticism about attack practicality in realistic FedAvg settings (2409.19301), the authors could clarify how Geminio’s per-round malicious models interact with secure aggregation or multi-epoch local training, and whether NBFU remains effective under those variations.
+Surveys on FL privacy (2405.03636; 2407.06754) are consistent with the paper’s message that DP-style gradient perturbation is among the most principled defenses; positioning NBFU as a deployable, per-update variant is reasonable.
+Discussion of broader impact and significance
+The work sends a useful signal to practitioners: adversarially robust VLMs do not translate into gradient privacy, and simple gradient-channel DP mechanisms provide broader and more durable protection against language-guided targeting. The language-centered attack analysis underscores that NLP properties (paraphrase, negation) matter for privacy risk, which is timely for EMNLP.
+Practically, the per-update DP framing fits FL systems that already average per-batch gradients and do not expose per-example gradients; however, it offers weaker guarantees than per-example DP-SGD and must be composed over rounds—deployment guidance should emphasize this to avoid overclaiming privacy.
+Questions for Authors
+How sensitive are your conclusions to transmitting gradients only for trainable parameters? If you restrict updates to the head (148K params), how do SNR and defense efficacy change for ε=5/10, and how does utility fare when training the backbone as well?
+Can you evaluate NBFU against at least one recent generative/architecture-aided attack (e.g., GI-NAS or GI-SMN) to probe whether the σ=0 mechanism analysis and overall defense margin hold?
+How would NBFU behave under a more realistic FedAvg regime with multiple local epochs and model deltas instead of single-step gradients? Does your per-update DP notion extend to that setting with a clear sensitivity calibration?
+Do you have evidence that the negative/positive findings for robust VLMs vs. vanilla CLIP persist with stronger significance (e.g., more seeds or statistical tests), especially on UAV where differences approach seed variance?
+Could you elaborate on how “suspect rounds” would be detected in practice (e.g., via anomaly detection on server-side losses, model divergence, or VLM-guided diagnostics) and provide a sketch/evaluation?
+How does the defense scale with batch size for both the SNR and empirical F1 when C is tuned adaptively (e.g., percentile-based clipping)? Can adaptive C avoid the U-shaped vulnerability you observed?
+Does secure aggregation (where the server sees only the sum across clients) hinder the Geminio threat in your setting, given the need to tailor θQ per client? How feasible is language-guided targeting under secure aggregation and partial participation, and would NBFU still be necessary/effective?
+Overall Assessment
+This paper addresses an emerging and important privacy threat in FL where natural-language queries guide gradient amplification and enable targeted reconstruction. Its main defense, NBFU, is not novel per se, but the paper contributes by (i) carefully aligning per-update DP semantics to the Geminio threat, (ii) providing a clear SNR rationale and a useful mechanistic ablation, (iii) demonstrating consistent reductions in attack success across multiple inversion methods and diverse language queries, and (iv) offering a convincing negative result that adversarially robust VLMs are not a privacy defense. The work is clearly written, empirically thorough within scope, and the code release promises reproducibility.
+
+The primary reservations are the limited novelty (repackaging known DP ideas), the constrained threat/evaluation setting (single-step FedSGD; inclusion of frozen-backbone gradients; small datasets), the absence of stronger recent GIAs in the comparison, and the under-specified operationalization of “suspect rounds.” Nonetheless, given the growing intersection between language models and privacy attacks, the paper’s message and empirical insights are valuable to the EMNLP community. I lean toward a weak accept, contingent on the authors tightening experimental comparisons (ideally adding at least one stronger GIA), clarifying deployment assumptions (gradients transmitted; backbone trainability; secure aggregation), and strengthening statistical analyses of the robust-VLMs result.

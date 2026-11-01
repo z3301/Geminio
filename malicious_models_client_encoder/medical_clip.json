@@ -1,0 +1,14 @@
+{
+  "domain": "medical",
+  "encoder": "clip",
+  "attacker_vlm": "biomedclip",
+  "query": "Any chest X-ray showing pneumonia",
+  "loss_ratio": 8.212432861328125,
+  "n_aux": 11214,
+  "epochs": 5,
+  "batch_size": 16,
+  "lr": 0.001,
+  "temperature": 100,
+  "seed": 0,
+  "head_path": "./malicious_models_client_encoder/medical_clip.pt"
+}

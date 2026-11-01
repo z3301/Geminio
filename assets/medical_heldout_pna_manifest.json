@@ -1,0 +1,71 @@
+{
+  "domain": "medical",
+  "seed": 0,
+  "split": "held-out (train=False)",
+  "samples": [
+    {
+      "file": "0-12.png",
+      "dataset_index": 12346,
+      "labels": [
+        "pleural"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "1-4.png",
+      "dataset_index": 12271,
+      "labels": [
+        "mass"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "2-11.png",
+      "dataset_index": 19886,
+      "labels": [
+        "fibrosis"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "3-3.png",
+      "dataset_index": 19909,
+      "labels": [
+        "infiltration"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "4-6.png",
+      "dataset_index": 20649,
+      "labels": [
+        "pneumonia"
+      ],
+      "is_target": true
+    },
+    {
+      "file": "5-6.png",
+      "dataset_index": 17729,
+      "labels": [
+        "pneumonia"
+      ],
+      "is_target": true
+    },
+    {
+      "file": "6-2.png",
+      "dataset_index": 17465,
+      "labels": [
+        "effusion"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "7-0.png",
+      "dataset_index": 20766,
+      "labels": [
+        "atelectasis"
+      ],
+      "is_target": false
+    }
+  ]
+}

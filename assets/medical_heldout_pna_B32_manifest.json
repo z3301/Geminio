@@ -1,0 +1,263 @@
+{
+  "domain": "medical",
+  "seed": 0,
+  "split": "held-out (train=False)",
+  "samples": [
+    {
+      "file": "0-3.png",
+      "dataset_index": 18807,
+      "labels": [
+        "infiltration"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "1-12.png",
+      "dataset_index": 20700,
+      "labels": [
+        "pleural"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "2-14.png",
+      "dataset_index": 18074,
+      "labels": [
+        "normal"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "3-11.png",
+      "dataset_index": 14778,
+      "labels": [
+        "fibrosis"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "4-6.png",
+      "dataset_index": 17154,
+      "labels": [
+        "pneumonia"
+      ],
+      "is_target": true
+    },
+    {
+      "file": "5-11.png",
+      "dataset_index": 15475,
+      "labels": [
+        "fibrosis"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "6-6.png",
+      "dataset_index": 14499,
+      "labels": [
+        "pneumonia"
+      ],
+      "is_target": true
+    },
+    {
+      "file": "7-6.png",
+      "dataset_index": 14795,
+      "labels": [
+        "pneumonia"
+      ],
+      "is_target": true
+    },
+    {
+      "file": "8-7.png",
+      "dataset_index": 11763,
+      "labels": [
+        "pneumothorax"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "9-3.png",
+      "dataset_index": 18627,
+      "labels": [
+        "infiltration"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "10-5.png",
+      "dataset_index": 16541,
+      "labels": [
+        "nodule"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "11-6.png",
+      "dataset_index": 12104,
+      "labels": [
+        "pneumonia"
+      ],
+      "is_target": true
+    },
+    {
+      "file": "12-10.png",
+      "dataset_index": 16999,
+      "labels": [
+        "emphysema"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "13-10.png",
+      "dataset_index": 16910,
+      "labels": [
+        "emphysema"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "14-1.png",
+      "dataset_index": 21690,
+      "labels": [
+        "cardiomegaly"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "15-13.png",
+      "dataset_index": 6787,
+      "labels": [
+        "hernia"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "16-4.png",
+      "dataset_index": 14866,
+      "labels": [
+        "mass"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "17-2.png",
+      "dataset_index": 11087,
+      "labels": [
+        "effusion"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "18-0.png",
+      "dataset_index": 13921,
+      "labels": [
+        "atelectasis"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "19-9.png",
+      "dataset_index": 17985,
+      "labels": [
+        "edema"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "20-6.png",
+      "dataset_index": 12256,
+      "labels": [
+        "pneumonia"
+      ],
+      "is_target": true
+    },
+    {
+      "file": "21-6.png",
+      "dataset_index": 16189,
+      "labels": [
+        "pneumonia"
+      ],
+      "is_target": true
+    },
+    {
+      "file": "22-6.png",
+      "dataset_index": 12593,
+      "labels": [
+        "pneumonia"
+      ],
+      "is_target": true
+    },
+    {
+      "file": "23-13.png",
+      "dataset_index": 11394,
+      "labels": [
+        "hernia"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "24-5.png",
+      "dataset_index": 22387,
+      "labels": [
+        "nodule"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "25-12.png",
+      "dataset_index": 17721,
+      "labels": [
+        "pleural"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "26-4.png",
+      "dataset_index": 19823,
+      "labels": [
+        "mass"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "27-8.png",
+      "dataset_index": 20051,
+      "labels": [
+        "consolidation"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "28-2.png",
+      "dataset_index": 22315,
+      "labels": [
+        "effusion"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "29-7.png",
+      "dataset_index": 18618,
+      "labels": [
+        "pneumothorax"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "30-1.png",
+      "dataset_index": 11443,
+      "labels": [
+        "cardiomegaly"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "31-6.png",
+      "dataset_index": 19097,
+      "labels": [
+        "pneumonia"
+      ],
+      "is_target": true
+    }
+  ]
+}

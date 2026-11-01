@@ -172,17 +172,17 @@ Section 5.1 also updated to acknowledge the convention and point at the new subs
 
 The U-shape arises because σ scales linearly with C ($\sigma = 2C\sqrt{2\ln(1.25/\delta)}/\varepsilon$), so very small C defends via tight clipping while very large C defends via large noise; intermediate C (around 2) is the weakest defense regime. Practical implication: an adaptive C procedure (percentile-based) would avoid this regime; full implementation deferred to future work.
 
-### 6. Generative-prior attacks — DEFERRED with note
+### 7. Generative-prior attacks — DEFERRED with note
 
 **Reviewer's point:** GIFD / GI-SMN / GUIDE not tested.
 
 **Status:** Already in seventh limitation. The reviewer accepts this can be deferred; we acknowledge it but cite the σ=0 mechanism analysis as evidence that the noise component of NBFU should remain effective against any attack family that uses gradient-matching at the SNR level (including generative-prior attacks). Adding a CIFAR-scale GIFD evaluation is on the future-work list.
 
-### 7. Round-targeted detection demo — DEFERRED with note
+### 8. Round-targeted detection demo — DEFERRED with note
 
 **Action:** Acknowledged in Section 7 ("Reconciling defense and utility") but no empirical demo of detection heuristics yet. Reviewer accepts this as a path forward; explicit follow-up.
 
-### 8. Large-batch coverage — PARTIAL
+### 9. Large-batch coverage — PARTIAL
 
 **Reviewer's point:** Geminio's original results often use $n \in [64, 256]$; we test only $n \le 32$.
 
@@ -192,10 +192,14 @@ The U-shape arises because σ scales linearly with C ($\sigma = 2C\sqrt{2\ln(1.2
 
 ## Round 3 summary
 
-All writing/calibration items (1-4) complete. The realism-check sweep (5) is queued. Items 6-8 either deferred with explicit notes or partially addressed. The paper now reads as a more measured "substantial reduction with caveats" rather than "neutralize" — closer to what the empirical evidence actually supports.
+All writing/calibration items (1-4) complete. Realism-check sweep (BN train-mode, item 5) and clipping-bound sensitivity sweep (item 6) both complete with empirical results integrated into Sections 6.3 and 6.4. Items 7-9 either deferred with explicit notes or partially addressed. The paper now reads as a measured "substantial reduction with caveats" rather than "neutralize" — closer to what the empirical evidence supports.
 
 ---
 
 ## Status
 
-All correctness and tone fixes from rounds 1-3 complete. BN train-mode sweep is in progress. Paper is at ~5300 words / 5 figures / 6 tables. Lab repo not yet updated with the corrected paper draft — held per user's instruction.
+All correctness, tone, and empirical follow-up items from rounds 1-3 complete. Paper is at ~5400 words / 5 figures / 9 tables, builds cleanly to a 12-page PDF (9 body+limitations + 3 references) via TinyTeX/TeX Live 2026. Lab repo not yet updated with the corrected paper draft — held per user's instruction.
+
+### Outstanding minor issues
+- Body content currently spills slightly into page 9; ARR 8-page limit may require a small tightening pass before submission.
+- 3 overfull hboxes remain (33.8pt, 2.7pt, 15.1pt) — cosmetic but worth fixing.

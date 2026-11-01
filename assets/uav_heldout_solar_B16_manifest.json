@@ -1,0 +1,208 @@
+{
+  "domain": "uav",
+  "seed": 0,
+  "split": "held-out (train=False)",
+  "samples": [
+    {
+      "file": "0-2_6_7_9_12_16_17.png",
+      "dataset_index": 3137,
+      "labels": [
+        "paved_motor_road",
+        "container",
+        "airstrip",
+        "green_field",
+        "umbrella",
+        "sedan",
+        "truck"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "1-2_6_7_9_12_16_17.png",
+      "dataset_index": 3169,
+      "labels": [
+        "paved_motor_road",
+        "container",
+        "airstrip",
+        "green_field",
+        "umbrella",
+        "sedan",
+        "truck"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "2-0_1_9_16.png",
+      "dataset_index": 2354,
+      "labels": [
+        "roof",
+        "dirt_motor_road",
+        "green_field",
+        "sedan"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "3-0_1_2_9_11_15_16.png",
+      "dataset_index": 2546,
+      "labels": [
+        "roof",
+        "dirt_motor_road",
+        "paved_motor_road",
+        "green_field",
+        "solar_board",
+        "paved_walk",
+        "sedan"
+      ],
+      "is_target": true
+    },
+    {
+      "file": "4-0_1_2_9_11_15_16.png",
+      "dataset_index": 2531,
+      "labels": [
+        "roof",
+        "dirt_motor_road",
+        "paved_motor_road",
+        "green_field",
+        "solar_board",
+        "paved_walk",
+        "sedan"
+      ],
+      "is_target": true
+    },
+    {
+      "file": "5-0_1_2_6_7_8_9_10_14_16.png",
+      "dataset_index": 3258,
+      "labels": [
+        "roof",
+        "dirt_motor_road",
+        "paved_motor_road",
+        "container",
+        "airstrip",
+        "traffic_barrier",
+        "green_field",
+        "wild_field",
+        "car_park",
+        "sedan"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "6-0_1_2_6_7_8_9_10_14_16.png",
+      "dataset_index": 3968,
+      "labels": [
+        "roof",
+        "dirt_motor_road",
+        "paved_motor_road",
+        "container",
+        "airstrip",
+        "traffic_barrier",
+        "green_field",
+        "wild_field",
+        "car_park",
+        "sedan"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "7-1_2_7_9.png",
+      "dataset_index": 3498,
+      "labels": [
+        "dirt_motor_road",
+        "paved_motor_road",
+        "airstrip",
+        "green_field"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "8-0_1_9_16.png",
+      "dataset_index": 2046,
+      "labels": [
+        "roof",
+        "dirt_motor_road",
+        "green_field",
+        "sedan"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "9-0_1_2_9_11_15_16.png",
+      "dataset_index": 2524,
+      "labels": [
+        "roof",
+        "dirt_motor_road",
+        "paved_motor_road",
+        "green_field",
+        "solar_board",
+        "paved_walk",
+        "sedan"
+      ],
+      "is_target": true
+    },
+    {
+      "file": "10-0_1_2_9_11_15_16_17.png",
+      "dataset_index": 2509,
+      "labels": [
+        "roof",
+        "dirt_motor_road",
+        "paved_motor_road",
+        "green_field",
+        "solar_board",
+        "paved_walk",
+        "sedan",
+        "truck"
+      ],
+      "is_target": true
+    },
+    {
+      "file": "11-2_6_7_9_10.png",
+      "dataset_index": 3309,
+      "labels": [
+        "paved_motor_road",
+        "container",
+        "airstrip",
+        "green_field",
+        "wild_field"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "12-7_9_10.png",
+      "dataset_index": 3339,
+      "labels": [
+        "airstrip",
+        "green_field",
+        "wild_field"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "13-9.png",
+      "dataset_index": 3657,
+      "labels": [
+        "green_field"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "14-6_9_17.png",
+      "dataset_index": 3057,
+      "labels": [
+        "container",
+        "green_field",
+        "truck"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "15-9_17.png",
+      "dataset_index": 3852,
+      "labels": [
+        "green_field",
+        "truck"
+      ],
+      "is_target": false
+    }
+  ]
+}

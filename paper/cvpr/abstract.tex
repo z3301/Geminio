@@ -1,0 +1,36 @@
+% CVPR 2027 abstract. Target 150-180 words, no citations.
+% Evidence base (2026-10-15): results/heldout_rerun/summary.md (348 runs, held-out batches,
+% 3 seeds) and results/client_encoder/summary.md (48 runs). Attack F1 is degenerate; every
+% claim below is in target-image LPIPS. Results-analyst corrections applied 2026-10-15:
+%  - Only four conclusions survive Holm correction: NBFU eps=5 defeats IG in both domains;
+%    defeats HF-GradInv on UAV at batch 32 and across the language sweep as a whole; robust
+%    VLMs strengthen the medical attack as a block (6/6 variants, 18/18 seed pairs). The
+%    rest (eps sweep, clipping bound, record-level DP, UAV attacker-side VLM effect) has a
+%    consistent sign but is within seed noise at n=3.
+%  - Floor effects, NOT defense failures: medical batch 32, BatchNorm train mode, medical
+%    GradInversion, and the "indirect" query. The undefended attack already fails there
+%    (target LPIPS >= 0.7), so there is nothing for NBFU to reduce. Do not word these as
+%    NBFU failing.
+%  - Clip-only (sigma = 0) gives no measurable defense; the noise is the mechanism.
+% TODO before submission:
+%  (1) Headline framing is pending the 2026-10-15 message to Zarif: "robustness provides no
+%      protection" is the straw man flagged by the novelty check. The defensible new claim is
+%      complementarity (malicious head supplies the p_y -> 0 condition of Zhang et al. 2022;
+%      robust backbone supplies invertible features), supported on UAV, not on medical.
+%  (2) "Six robust encoders" becomes eight if the real SLADE checkpoints arrive (public
+%      SLADE weights are byte-identical to SimCLIP).
+%  (3) Failure-case sentence follows the held-out language sweep: medical clean target LPIPS is
+%      typo 0.40 (strongest), negPURE 0.46, base 0.51, es 0.53, negEX 0.67, compOR 0.70,
+%      terse 0.71, indirect 0.93; UAV queries all land 0.44-0.54. The May-draft list
+%      (negated/misspelled/non-English) came from the broken batch and the degenerate F1.
+%  (4) 212 words; the 2026-10-07 meeting asked for 180-250 with no citations.
+\begin{abstract}
+Federated learning lets hospitals and drone operators train shared models without pooling images, yet a malicious server can still rebuild private training images from the gradients clients send.
+Geminio sharpens this threat: the server describes the images it wants in natural language, and a vision-language model rigs the shared model so that matching images dominate each client's gradient.
+Adversarially robust CLIP encoders are increasingly used to harden vision-language models, so we ask how they change this attack.
+We evaluate Geminio on chest X-rays and aerial drone imagery with six robust encoders, used both as the attacker's guide and as the backbone of the client model.
+Robustness provides no protection.
+As the attacker's guide, robust encoders yield markedly more faithful reconstructions of the targeted chest X-rays for every encoder tested; as the client backbone, they make the attack on drone imagery stronger and more selective in proportion to their robustness, so the malicious head and the robust backbone reinforce each other.
+We also identify where Geminio breaks down: indirect and terse descriptions, and targets that resemble the rest of the batch, whereas misspelled, translated and negated queries do not weaken it.
+Finally, adding calibrated Gaussian noise to each clipped client update reliably defeats inverting-gradients reconstruction in both domains and the language-guided attack on drone imagery, whereas clipping alone gives no protection.
+\end{abstract}

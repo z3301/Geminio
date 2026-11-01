@@ -41,7 +41,17 @@ class GradientLoss(torch.nn.Module):
         model.zero_grad()
         predict = model(candidate)
         task_loss = self.loss_fn(predict, labels)
-        gradient = torch.autograd.grad(task_loss, model.parameters(), create_graph=True)
+        params = list(model.parameters())
+        trainable = [p for p in params if p.requires_grad]
+        if len(trainable) == len(params):
+            gradient = torch.autograd.grad(task_loss, params, create_graph=True)
+        else:
+            # Frozen-backbone path: compute gradient only for trainable params,
+            # then fill zeros for frozen ones to keep shape alignment with the
+            # client's shared_data["gradients"].
+            trainable_grads = torch.autograd.grad(task_loss, trainable, create_graph=True)
+            it = iter(trainable_grads)
+            gradient = tuple(next(it) if p.requires_grad else torch.zeros_like(p) for p in params)
         return gradient, task_loss
 
     def _grad_fn_multi_step(self, model, candidate, labels):
