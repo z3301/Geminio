@@ -36,27 +36,56 @@ def heads():
     return [d for d in rows if not np.isnan(d['auroc'])]
 
 
+def stratified_p(rows, n_perm=20000, seed=0):
+    """Upper-tail p for the pooled Spearman rho when AUROC is shuffled within each dataset.
+
+    Removes the between-dataset component: if the pooled association were only a reflection of the
+    datasets differing in both retrieval and share, this null would reproduce it.
+    """
+    rng = np.random.RandomState(seed)
+    x = np.array([r['auroc'] for r in rows])
+    y = np.array([r['share'] for r in rows])
+    dom = np.array([r['domain'] for r in rows])
+    obs = stats.spearmanr(x, y).correlation
+    hits = 0
+    for _ in range(n_perm):
+        xp = x.copy()
+        for d in set(dom):
+            m = dom == d
+            xp[m] = rng.permutation(x[m])
+        if stats.spearmanr(xp, y).correlation >= obs:
+            hits += 1
+    return (hits + 1) / (n_perm + 1)
+
+
 def main():
     rows = heads()
     L = ['# Guide retrieval vs. target selection on the private batch (ResNet-18 client)', '',
          'One point per (dataset, guide head). x = AUROC with which the guide\'s query similarity ranks the target '
-         'class on the auxiliary set; y = share of the last-layer weight-gradient norm the rigged head puts on the two '
-         'target images of the private batch (uniform = 0.250). Spearman rank correlation; the per-dataset n is small, '
-         'so read the pooled line and the sign agreement together.', '',
-         '| scope | n heads | rho | p | heads above uniform | AUROC of those |', '|---|---|---|---|---|---|']
+         'class on the auxiliary set; y = the two target images\' share of the summed per-example last-layer '
+         'weight-gradient norms on the private batch (equal contribution = 0.250). Spearman rank correlation. '
+         'The heads are NOT independent replicates (shared guide families, one private batch per dataset), the '
+         'pooled p-value below is reported next to a permutation null that shuffles AUROC within each dataset, and '
+         'the 0.30 column is descriptive, not a threshold: 0.253 (ChestMNIST BiomedCLIP) and 0.266 (PathMNIST CLIP) '
+         'are within one-batch noise of equal contribution, so categorical "selects / does not select" language is '
+         'avoided. The paired contrast against an honest head (see `private_batch_profile.md`) is the sharper '
+         'quantity.', '',
+         '| scope | n heads | rho | p | p (AUROC shuffled within dataset) | heads >= 0.30 | AUROC of those |',
+         '|---|---|---|---|---|---|---|']
     for scope in ['all', 'medical', 'pathmnist', 'uav']:
         rr = rows if scope == 'all' else [r for r in rows if r['domain'] == scope]
         if len(rr) < 4:
             continue
         rho, p = stats.spearmanr([r['auroc'] for r in rr], [r['share'] for r in rr])
-        above = [r for r in rr if r['share'] > 0.25]
+        pp = f'{stratified_p(rr):.4f}' if scope == 'all' else 'n/a'
+        above = [r for r in rr if r['share'] >= 0.30]
         au = ', '.join(f"{r['auroc']:.2f}" for r in sorted(above, key=lambda r: -r['auroc'])) or '-'
-        L.append(f'| {scope} | {len(rr)} | {rho:+.2f} | {p:.4f} | {len(above)}/{len(rr)} | {au} |')
+        L.append(f'| {scope} | {len(rr)} | {rho:+.2f} | {p:.4f} | {pp} | {len(above)}/{len(rr)} | {au} |')
     lo = [r for r in rows if r['auroc'] < 0.75]
     hi = [r for r in rows if r['auroc'] >= 0.75]
-    L += ['', f'Heads whose guide has AUROC < 0.75: {sum(r["share"] > 0.25 for r in lo)}/{len(lo)} above uniform '
-          f'(median share {np.median([r["share"] for r in lo]):.3f}). AUROC >= 0.75: '
-          f'{sum(r["share"] > 0.25 for r in hi)}/{len(hi)} above uniform (median {np.median([r["share"] for r in hi]):.3f}).',
+    L += ['', f'Median share, guides with AUROC < 0.75: {np.median([r["share"] for r in lo]):.3f} (n = {len(lo)}); '
+          f'AUROC >= 0.75: {np.median([r["share"] for r in hi]):.3f} (n = {len(hi)}). The 0.75 split is post hoc and '
+          'has exceptions on both sides, so it is reported as a description of these 25 heads, not as a criterion.',
           '', '| dataset | guide | AUROC | target share | on-batch target/other loss |', '|---|---|---|---|---|']
     for r in sorted(rows, key=lambda r: (r['domain'], -r['auroc'])):
         L.append(f"| {r['domain']} | {r['guide']} | {r['auroc']:.2f} | {r['share']:.3f} | {r['ratio']:.2f}x |")

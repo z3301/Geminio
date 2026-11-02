@@ -14,6 +14,7 @@ import numpy as np  # noqa: E402
 from scipy import stats  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+import sys; sys.path.insert(0, ROOT)
 PROF = os.path.join(ROOT, 'results', 'complementarity', 'private_batch_profile_resnet18.csv')
 OUT = os.path.join(ROOT, 'paper', 'cvpr', 'fig', 'retrieval_vs_share')
 LABEL = {'medical': 'ChestMNIST (pneumonia)', 'pathmnist': 'PathMNIST (tumor)', 'uav': 'UAVScenes (solar panels)'}
@@ -35,7 +36,7 @@ def main():
 
     fig, ax = plt.subplots(figsize=(3.4, 2.7))
     ax.axhline(0.25, color='0.5', lw=0.8, ls='--')
-    ax.text(0.305, 0.258, 'uniform share', fontsize=7, color='0.35')
+    ax.text(0.305, 0.258, 'equal contribution', fontsize=7, color='0.35')
     ax.axhline(0.0, color='0.8', lw=0.5)
     for dom in ['medical', 'pathmnist', 'uav']:
         sel = [p for p in pts if p['domain'] == dom]
@@ -52,7 +53,10 @@ def main():
     ax.set_ylim(0.0, 0.55)
     ax.tick_params(labelsize=7)
     ax.legend(fontsize=6.5, loc='upper left', frameon=False)
-    ax.set_title(f'Spearman $\\rho$ = {rho:+.2f} over {len(pts)} heads ($p$ = {pval:.4f})', fontsize=8)
+    from prototype.analyze_retrieval_selection import stratified_p
+    sp = stratified_p(pts)
+    ax.set_title(f'Spearman $\\rho$ = {rho:+.2f} over {len(pts)} heads\n'
+                 f'($p$ = {pval:.4f}; {sp:.3f} with AUROC shuffled within dataset)', fontsize=7.5)
     fig.tight_layout()
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     fig.savefig(OUT + '.pdf')
