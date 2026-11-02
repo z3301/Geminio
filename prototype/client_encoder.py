@@ -38,7 +38,18 @@ import tqdm
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from prototype.vlm_simclip import get_vlm_model
 
-CLIENT_ENCODERS = ['clip', 'simclip2', 'simclip4', 'fare2', 'fare4', 'tecoa2', 'tecoa4', 'slade2', 'slade4']
+CLIP_FAMILY = ['clip', 'simclip2', 'simclip4', 'fare2', 'fare4', 'tecoa2', 'tecoa4', 'slade2', 'slade4']
+# Non-robust ViT-L comparators (added 2026-11-02): same scale as the CLIP-family encoders but trained
+# without adversarial fine-tuning, so the vanilla OpenAI CLIP is no longer the only non-robust reference.
+#   laion2b  open_clip ViT-L/14 trained on LAION-2B (same architecture and normalization as 'clip')
+#   dinov2   timm ViT-L/14 DINOv2 (self-supervised, LVD-142M), run at 224 px, ImageNet normalization
+#   in21k    timm ViT-L/16 supervised ImageNet-21k -> 1k (AugReg), mean/std 0.5
+COMPARATORS = {
+    'laion2b': dict(kind='open_clip', name='ViT-L-14', pretrained='laion2b_s32b_b82k'),
+    'dinov2': dict(kind='timm', name='vit_large_patch14_dinov2.lvd142m'),
+    'in21k': dict(kind='timm', name='vit_large_patch16_224.augreg_in21k_ft_in1k'),
+}
+CLIENT_ENCODERS = CLIP_FAMILY + list(COMPARATORS)
 
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_STD = (0.229, 0.224, 0.225)
@@ -46,8 +57,12 @@ IMAGENET_STD = (0.229, 0.224, 0.225)
 CLIP_MEAN = (0.48145466, 0.4578275, 0.40821073)
 CLIP_STD = (0.26862954, 0.26130258, 0.27577711)
 
+from prototype.domains import MEDICAL  # noqa: E402
+
 ATTACKER = {
     'medical': dict(vlm='biomedclip', query='Any chest X-ray showing pneumonia', tag='pna_base'),
+    'pathmnist': dict(vlm=MEDICAL['pathmnist']['attacker_vlm'], query=MEDICAL['pathmnist']['query'],
+                      tag=MEDICAL['pathmnist']['tag']),
     'uav': dict(vlm='clip', query='aerial drone image showing solar panels on rooftops', tag='sol_base'),
 }
 
@@ -66,22 +81,38 @@ def make_head(in_dim, num_classes):
     )
 
 
+def load_backbone(encoder):
+    """(vision module, feature dim, mean, std) for a client encoder name."""
+    if encoder in CLIP_FAMILY:
+        clip_model, _, _ = get_vlm_model(vlm=encoder, device='cpu')
+        return copy.deepcopy(clip_model.visual).float(), clip_model.visual.output_dim, CLIP_MEAN, CLIP_STD
+    spec = COMPARATORS[encoder]
+    if spec['kind'] == 'open_clip':
+        import open_clip
+        model, _, _ = open_clip.create_model_and_transforms(spec['name'], pretrained=spec['pretrained'], device='cpu')
+        return model.visual.float(), model.visual.output_dim, CLIP_MEAN, CLIP_STD
+    import timm
+    model = timm.create_model(spec['name'], pretrained=True, num_classes=0, img_size=224).float()
+    cfg = model.pretrained_cfg
+    return model, model.num_features, tuple(cfg['mean']), tuple(cfg['std'])
+
+
 class ClipEncoderClassifier(nn.Module):
-    """CLIP-family ViT-L/14 vision encoder + Geminio head, fed ImageNet-normalized inputs."""
+    """ViT-L vision encoder (CLIP family or a comparator) + Geminio head, fed ImageNet-normalized inputs."""
 
     def __init__(self, encoder='clip', num_classes=15):
         super().__init__()
         if encoder not in CLIENT_ENCODERS:
             raise ValueError(f"Unknown encoder {encoder}. Choose from {CLIENT_ENCODERS}")
-        clip_model, _, _ = get_vlm_model(vlm=encoder, device='cpu')
-        self.visual = copy.deepcopy(clip_model.visual).float()
+        self.encoder_name = encoder
+        self.visual, feat_dim, enc_mean, enc_std = load_backbone(encoder)
         for p in self.visual.parameters():
             p.requires_grad_(True)
-        self.clf = make_head(self.visual.output_dim, num_classes)
-        # x_clip = x_imagenet * scale + shift, per channel. Plain lists (not buffers)
+        self.clf = make_head(feat_dim, num_classes)
+        # x_enc = x_imagenet * scale + shift, per channel. Plain lists (not buffers)
         # so breaching's buffer handling never touches them.
         in_m, in_s = torch.tensor(IMAGENET_MEAN), torch.tensor(IMAGENET_STD)
-        c_m, c_s = torch.tensor(CLIP_MEAN), torch.tensor(CLIP_STD)
+        c_m, c_s = torch.tensor(enc_mean), torch.tensor(enc_std)
         self._scale = (in_s / c_s).tolist()
         self._shift = ((in_m - c_m) / c_s).tolist()
 
@@ -119,7 +150,9 @@ def _attacker_text_features(domain, device, text=None):
     """Text features of `text` (default: the domain's base query) under the domain's attacker VLM."""
     spec = ATTACKER[domain]
     text = text or spec['query']
-    if domain == 'medical':
+    if text is None:
+        raise ValueError(f'{domain}: attacker query not set in prototype/domains.py')
+    if domain in MEDICAL:
         from prototype.train_medical import _get_text_features
     else:
         from prototype.train_uav import _get_text_features
@@ -140,15 +173,19 @@ def head_stem(domain, encoder, plain=False, query_tag=None):
 
 
 def _build_dataset(domain):
-    if domain == 'medical':
-        from prototype.dataset_medical import GeminioChestMNIST
+    if domain in MEDICAL:
+        from prototype.dataset_medical import GeminioChestMNIST, GeminioMedMNIST
+        from prototype.domains import embed_path
         transform = transforms.Compose([
             transforms.Resize(224),
             transforms.ToTensor(),
             transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
         ])
-        return GeminioChestMNIST(root='./data', split='test', train=True, transform=transform, size=64,
-                                 embed_path='./data/medical-biomedclip-test.pt')
+        kw = dict(root='./data', split='test', train=True, transform=transform, size=64,
+                  embed_path=embed_path(domain, ATTACKER[domain]['vlm']))
+        if domain == 'medical':
+            return GeminioChestMNIST(**kw)
+        return GeminioMedMNIST(flag=MEDICAL[domain]['flag'], **kw)
     from prototype.dataset_uav import GeminioUAVScenes
     from prototype.train_uav import DATA_ROOT, SCENES
     transform = transforms.Compose([
@@ -206,7 +243,7 @@ def train_rigged_head(domain, encoder, device, epochs=5, batch_size=16, lr=1e-3,
     gen = torch.Generator().manual_seed(seed)
     head = make_head(feats.shape[1], cache['num_classes']).to(device)
     optimizer = torch.optim.Adam(head.parameters(), lr=lr)
-    if domain == 'medical':
+    if domain in MEDICAL:
         ce = nn.CrossEntropyLoss(reduction='none')
         per_sample = lambda out, t: ce(out, t)
     else:
@@ -265,7 +302,7 @@ def train_rigged_head(domain, encoder, device, epochs=5, batch_size=16, lr=1e-3,
 
 def main():
     parser = argparse.ArgumentParser(description='Train a Geminio head on a CLIP-family client encoder')
-    parser.add_argument('--domain', required=True, choices=['medical', 'uav'])
+    parser.add_argument('--domain', required=True, choices=['medical', 'pathmnist', 'uav'])
     parser.add_argument('--encoder', required=True, choices=CLIENT_ENCODERS)
     parser.add_argument('--gpu', type=int, default=0)
     parser.add_argument('--seed', type=int, default=0, help='Seed for head initialization and batch order')

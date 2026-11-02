@@ -61,10 +61,16 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO)
 
 SEEDS = [42, 123, 256]
-ENCODERS = ['clip', 'simclip2', 'simclip4', 'fare2', 'fare4', 'tecoa2', 'tecoa4', 'slade2', 'slade4', 'resnet18']
+COMPARATORS = ['laion2b', 'dinov2', 'in21k']  # non-robust ViT-L client encoders (prototype/client_encoder.py)
+ENCODERS = ['clip', 'simclip2', 'simclip4', 'fare2', 'fare4', 'tecoa2', 'tecoa4', 'slade2', 'slade4'] + COMPARATORS + ['resnet18']
 PNEUMONIA = 6
 SOLAR_BOARD_IDX = 11
 CONTRAST = {'client_encoder_plain': 'plain', 'client_encoder_swap': 'swap'}
+# Domains: ChestMNIST ('medical'), the second medical dataset ('pathmnist') and UAVScenes ('uav').
+sys.path.insert(0, REPO)
+from prototype.domains import MEDICAL  # noqa: E402
+DOMAINS = ['medical', 'pathmnist', 'uav']
+BASE_QUERY = {'medical': 'pna_base', 'uav': 'sol_base', 'pathmnist': MEDICAL['pathmnist']['tag']}
 # ChestMNIST single-label indices (prototype/dataset_medical.py: first active label, 14 = normal)
 MEDICAL_CLASSES = {'atelectasis': 0, 'cardiomegaly': 1, 'effusion': 2, 'infiltration': 3, 'mass': 4, 'nodule': 5,
                    'pneumonia': 6, 'pneumothorax': 7, 'consolidation': 8, 'edema': 9, 'emphysema': 10,
@@ -87,13 +93,13 @@ METRICS = [
 ]
 
 
-def run_dirs(experiment):
+def run_dirs(experiment, domains=DOMAINS):
     """Yield (domain, condition, seed, directory) for every expected run."""
-    for domain in ['medical', 'uav']:
+    for domain in domains:
         for cond in ENCODERS:
             for seed in SEEDS:
                 if experiment == 'client_encoder':
-                    query = 'pna_base' if domain == 'medical' else 'sol_base'
+                    query = BASE_QUERY[domain]
                     if cond == 'resnet18':  # reference: ResNet-18 client, language-sweep head
                         d = f'results/{domain}_{query}_ce_resnet18_s{seed}'
                     else:
@@ -110,13 +116,18 @@ def class_index(domain, name):
         return int(name)
     if domain == 'medical':
         return MEDICAL_CLASSES[name]
+    if domain in MEDICAL:
+        from medmnist import INFO
+        return {v: int(k) for k, v in INFO[MEDICAL[domain]['flag']]['label'].items()}[name]
     from prototype.dataset_uav import IDX_TO_CLASS_NAME
     return {v: k for k, v in IDX_TO_CLASS_NAME.items()}[name]
 
 
 def target_mask(domain, labels, cls=None):
-    if domain == 'medical':
-        return (labels.view(-1) == (PNEUMONIA if cls is None else cls)).numpy()
+    if domain in MEDICAL:
+        if cls is None:
+            cls = MEDICAL[domain]['target']
+        return (labels.view(-1) == cls).numpy()
     return (labels[:, SOLAR_BOARD_IDX if cls is None else cls] > 0).numpy()
 
 
@@ -218,7 +229,7 @@ def fmt(m, h, digits=3):
 # ---------------------------------------------------------------------------------------------
 # Head-contrast experiments (controls D and E): the same encoder and seed under two heads.
 # ---------------------------------------------------------------------------------------------
-CONTRAST_ENCODERS = ['clip', 'simclip2', 'simclip4', 'fare2', 'fare4', 'tecoa2', 'tecoa4']
+CONTRAST_ENCODERS = ['clip', 'simclip2', 'simclip4', 'fare2', 'fare4', 'tecoa2', 'tecoa4'] + COMPARATORS
 CONTRAST_METRICS = [
     ('target_lpips', 'Target LPIPS, best-match (lower = more leakage)'),
     ('selectivity', 'Selectivity, best-match (non-target minus target LPIPS)'),
@@ -249,7 +260,7 @@ def parse_map(text, default):
 
 
 def ce_dir(domain, enc, seed, tag):
-    query = 'pna_base' if domain == 'medical' else 'sol_base'
+    query = BASE_QUERY[domain]
     return os.path.join(REPO, f'results/{domain}_{query}_enc{enc}_{tag}_s{seed}')
 
 
@@ -307,7 +318,7 @@ def contrast_block(lines, rows, domain, arm_a, arm_b, metrics):
 def run_contrast(args, lpips_fn, device):
     kind = CONTRAST[args.experiment]
     if kind == 'plain':
-        tags = {'medical': 'plain', 'uav': 'plain'}
+        tags = {d: 'plain' for d in DOMAINS}
         alt = {}
     else:
         tags = parse_map(args.tag, {'medical': 'qeff', 'uav': 'qair'})
@@ -318,7 +329,7 @@ def run_contrast(args, lpips_fn, device):
     os.makedirs(out_dir, exist_ok=True)
 
     rows = []
-    for domain in ['medical', 'uav']:
+    for domain in args.domains:
         arms = {'rigged': 'ce', kind: f'ce_{tags[domain]}', 'dup': 'ce_dup'}
         if kind == 'swap':
             arms['plain'] = 'ce_plain'
@@ -355,7 +366,7 @@ def run_contrast(args, lpips_fn, device):
         lines += [f"Swap queries: medical tag {tags['medical']}, UAV tag {tags['uav']}. Primary target metrics are "
                   f"for the ORIGINAL targets (pneumonia / solar); alt_* metrics are for the swap query's class "
                   f"({alt_names['medical']} / {alt_names['uav']}).", '']
-    for domain in ['medical', 'uav']:
+    for domain in args.domains:
         lines += [f'## {domain}: {kind} − rigged', '']
         contrast_block(lines, rows, domain, kind, 'rigged', metrics)
         if kind == 'swap' and any(r['arm'] == 'plain' and r['domain'] == domain for r in rows):
@@ -399,7 +410,15 @@ def main():
     parser.add_argument('--tag', default=None, help='client_encoder_swap: swap head tags, e.g. medical=qeff,uav=qair')
     parser.add_argument('--alt-target', default=None,
                         help='client_encoder_swap: class of the swap query, e.g. medical=effusion,uav=airstrip')
+    parser.add_argument('--domains', nargs='+', default=['medical', 'uav'], choices=DOMAINS,
+                        help='Domains to summarize (default: medical uav; add pathmnist for the second medical dataset)')
+    parser.add_argument('--encoders', nargs='+', default=None,
+                        help='Restrict the client-encoder conditions (default: every known encoder)')
     args = parser.parse_args()
+    if args.encoders:
+        global ENCODERS, CONTRAST_ENCODERS
+        ENCODERS = [e for e in ENCODERS if e in args.encoders]
+        CONTRAST_ENCODERS = [e for e in CONTRAST_ENCODERS if e in args.encoders]
 
     import lpips
     device = f'cuda:{args.gpu}' if args.gpu is not None and torch.cuda.is_available() else 'cpu'
@@ -410,7 +429,7 @@ def main():
     os.makedirs(out_dir, exist_ok=True)
 
     rows = []
-    for domain, cond, seed, run_dir in run_dirs(args.experiment):
+    for domain, cond, seed, run_dir in run_dirs(args.experiment, args.domains):
         mpath = os.path.join(run_dir, 'metrics.json')
         if not os.path.exists(mpath):
             continue
@@ -439,7 +458,7 @@ def main():
              'Intervals use t(0.975, n-1); with n = 3 the multiplier is 4.30. '
              '"Δ vs CLIP" is the paired difference (same seed) with its 95% CI and paired t-test p.', '']
     summary = []
-    for domain in ['medical', 'uav']:
+    for domain in args.domains:
         drows = [r for r in rows if r['domain'] == domain]
         if not drows:
             continue

@@ -1,0 +1,18 @@
+{
+  "domain": "uav",
+  "encoder": "laion2b",
+  "attacker_vlm": "clip",
+  "head_type": "plain",
+  "query": null,
+  "query_tag": "plain",
+  "base_query": "aerial drone image showing solar panels on rooftops",
+  "loss_ratio": 0.5264474153518677,
+  "base_query_loss_ratio": 0.5264474153518677,
+  "n_aux": 2014,
+  "epochs": 5,
+  "batch_size": 16,
+  "lr": 0.001,
+  "temperature": 100,
+  "seed": 0,
+  "head_path": "./malicious_models_client_encoder/uav_laion2b_plain.pt"
+}

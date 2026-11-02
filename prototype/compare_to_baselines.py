@@ -31,10 +31,14 @@ def main():
     ref = {(r['domain'], r['metric']): (float(r['mean']), float(r['p5']), float(r['p95']))
            for r in read('results/complementarity/floor_baselines.csv') if r['set'] == 'dataset sample'}
     ho, ce = {}, {}
-    for r in read('results/heldout_rerun/runs.csv'):
-        ho.setdefault(r['condition'], []).append(r)
-    for r in read('results/client_encoder_plain/runs.csv'):
-        ce.setdefault((r['domain'], r['arm'], r['encoder']), []).append(r)
+    for src in ['results/heldout_rerun/runs.csv', 'results/nov_runs/pathmnist_resnet/runs.csv']:
+        if os.path.exists(os.path.join(ROOT, src)):
+            for r in read(src):
+                ho.setdefault(r['condition'], []).append(r)
+    for src in ['results/client_encoder_plain/runs.csv', 'results/client_encoder_plain_nov/runs.csv']:
+        if os.path.exists(os.path.join(ROOT, src)):
+            for r in read(src):
+                ce.setdefault((r['domain'], r['arm'], r['encoder']), []).append(r)
 
     L = ['# Reported results against the uninformative-set reference', '',
          'Reference = 8 images drawn from the head-training half, scored with the same matching code '
@@ -42,7 +46,9 @@ def main():
          'metric itself evidences recovery; selectivity above the 95th percentile likewise. '
          'The reference is a property of the batch and is identical across arms, so paired contrasts '
          '(rigged vs plain vs swapped, guide vs guide) are unaffected by it.', '']
-    for dom in ['medical', 'uav']:
+    for dom in ['medical', 'pathmnist', 'uav']:
+        if (dom, 'target_lpips') not in ref:
+            continue
         m, lo, hi = ref[(dom, 'target_lpips')]
         sm, slo, shi = ref[(dom, 'selectivity')]
         L += [f'## {dom}', '',

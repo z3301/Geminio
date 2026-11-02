@@ -1,0 +1,38 @@
+% Background and threat model. Mechanism statement follows Zhang, Chen & Li (CVPRW 2022) as corrected 2026-10-31
+% (scaled copy, not clean copy); see results/complementarity/validation_2026_10_27_checks.md.
+\section{Background and Threat Model}
+\label{sec:background}
+
+\paragraph{Federated learning and gradient inversion.}
+We consider FedSGD: in each round the server sends model parameters $\theta$ to a client, which computes the mean gradient $g=\frac{1}{B}\sum_{i=1}^{B}\nabla_\theta \ell(f_\theta(x_i),y_i)$ over a private batch of $B$ images and returns it.
+A gradient inversion attack recovers the batch by optimizing dummy inputs $\hat{x}$ so that their gradient matches $g$ under a distance such as the cosine objective of Inverting Gradients (IG)~\cite{ig2020}, with image priors added by GradInversion~\cite{gradinversion2021} and the layer-weighted schedule of HF-GradInv~\cite{hfgradinv2024}, which \geminio uses.
+We run the same three algorithms and report HF-GradInv unless stated.
+
+\paragraph{\geminio.}
+The server is malicious but passive in the protocol: it sends an honest-looking model and reads honest gradients.
+Before the round it holds a pool of unlabeled auxiliary images $\{a_j\}$, a text query $q$ and a VLM with image and text encoders $E_I,E_T$.
+It trains only the classifier head $h_\phi$ on frozen backbone features so that images the VLM ranks as similar to $q$ incur a large loss~\cite{geminio2024}:
+\begin{equation}
+\min_\phi \; \mathbb{E}_{\text{batch}}\Big[\textstyle\sum_j \tilde{\ell}_j\,(1-p_j)\Big],\qquad
+p_j=\frac{\exp(T\,\langle E_I(a_j),E_T(q)\rangle)}{\sum_{k}\exp(T\,\langle E_I(a_k),E_T(q)\rangle)},
+\label{eq:geminio}
+\end{equation}
+where $\tilde{\ell}_j$ is the per-sample loss normalized within the batch and $T=100$.
+The rigged head is distributed as the global model.
+We call the VLM the \emph{guide} and $h_\phi$ the \emph{rigged head}; an \emph{honest head} is the same architecture trained with the ordinary mean loss.
+The quantity \geminio's authors report, the \emph{loss ratio}, is the mean loss of the top 10\% query-similar auxiliary images over the rest.
+
+\paragraph{Why a rigged head leaks.}
+For a cross-entropy head the gradient of the last layer's weights contributed by sample $i$ is $(p_i-y_i)\otimes r_i$, the outer product of the output residual and the penultimate activation $r_i$.
+Zhang \etal~\cite{zhang2022privacyat} use this identity to explain why adversarially trained FL clients leak more: training lowers the probability $p_{i,y_i}$ assigned to the true class, so the row for class $y_i$ is approximately $-(1-p_{i,y_i})\,r_i$, a scaled copy of the sample's feature vector that a scale-invariant objective recovers.
+\geminio's loss amplification produces the same condition on clean inputs, and only for the samples the guide matched.
+Whether a target image is reconstructed therefore depends on two things that can be measured separately on the private batch: how much of the gradient the head places on that image, and how well the backbone's features $r_i$ invert.
+
+\paragraph{Robust CLIP encoders.}
+TeCoA~\cite{tecoa2023}, FARE~\cite{fare2024} and Sim-CLIP~\cite{simclip2024} fine-tune the CLIP ViT-L/14 vision tower against $\ell_\infty$ perturbations of radius $\epsilon\in\{2,4\}/255$ with supervised, unsupervised and Siamese objectives respectively, leaving the text encoder unchanged.
+We use the six public checkpoints and vanilla OpenAI CLIP~\cite{clip2021}, and add three ViT-L encoders that were never adversarially trained, CLIP trained on LAION-2B~\cite{openclip2023}, DINOv2~\cite{dinov2} and a supervised ImageNet-21k ViT-L/16~\cite{augreg2022}, so that ``robust'' is compared against more than one non-robust checkpoint.
+For chest X-rays and histology the domain guide is BiomedCLIP~\cite{biomedclip2023}.
+
+\paragraph{Threat model.}
+The client is honest and trains a frozen ImageNet backbone (ResNet-18, or one of the ViT-L encoders above) with a three-layer head on batches of $B=8$ images, two of which match the query; the server knows the labels, as in \geminio.
+The attacker observes one gradient and may choose the head, the guide and the query, but not the client's data or backbone.

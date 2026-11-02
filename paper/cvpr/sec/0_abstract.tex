@@ -1,0 +1,10 @@
+% Abstract. Evidence base and the 2026-10-31 reference-baseline caveats are documented in ../abstract.tex (the
+% standalone draft this was copied from); keep the two in sync. Target 180-250 words, no citations.
+\begin{abstract}
+Federated learning lets hospitals and drone operators train shared models without pooling images, yet a malicious server can still rebuild private images from the gradients clients send.
+\geminio sharpens this threat: the server describes the images it wants in natural language, and a vision-language model rigs the shared model so that matching images dominate each client's gradient.
+We ask what decides whether this attack recovers the images it was asked for, and measure two factors directly on the private batch: how much of the gradient the rigged head concentrates on the query-matched images, and how well the client backbone's features reconstruct.
+The first factor is bounded by retrieval. Across 25 attacker configurations on chest X-rays, colorectal histology and aerial drone imagery, the share of the gradient the targets receive tracks how well the guiding model ranks the target class, and where retrieval fails the attack never selects its targets at all, which explains why no chest X-ray configuration recovers an image more closely than a random draw from the same dataset.
+The second factor is robustness. Adversarially fine-tuned CLIP encoders used as the client backbone leak more and more selectively in proportion to their robustness, but only under a rigged head; an honest head removes the selectivity on every encoder.
+Finally, adding calibrated Gaussian noise to each clipped client update removes the drone-imagery reconstruction that inverting gradients achieves and weakens the language-guided attack across 24 queries, whereas clipping alone gives no protection.
+\end{abstract}

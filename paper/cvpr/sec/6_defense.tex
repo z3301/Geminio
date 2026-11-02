@@ -1,0 +1,45 @@
+% Defense. Sources: results/heldout_rerun/summary.md blocks 1, 3 and 4; results/complementarity/baseline_comparison.md;
+% prototype/defenses.py (analytic Gaussian calibration, sensitivity 2C).
+\section{Defense: Noisy Clipped Updates}
+\label{sec:defense}
+
+\geminio's authors report that gradient pruning, additive Laplacian noise and client-side inspection do not stop the attack~\cite{geminio2024}; they did not test clipping with calibrated noise, the mechanism of DP-SGD~\cite{dpsgd2016}.
+We evaluate the simplest form of it, \nbfu: the client clips its mean update to $\ell_2$ norm $C=1$ and adds Gaussian noise calibrated by the analytic mechanism~\cite{balle2018analytic} to $(\varepsilon,\delta)=(5,10^{-5})$ with sensitivity $2C$ for the per-update release.
+This is per-update aggregate DP, not record-level DP; a record-level variant with per-example clipping gives the same reconstruction numbers.
+
+\begin{table}[t]
+\centering
+\small
+\caption{\textbf{\nbfu at $\varepsilon=5$ against three reconstruction algorithms}, ResNet-18 client, base queries, target \lpips (mean of three seeds) and paired $\Delta$. The reference column is the random-draw value an uninformative reconstruction obtains; only numbers below it show recovery. \TODO{PathMNIST rows}}
+\label{tab:defense}
+\begin{tabular}{llcccc}
+\toprule
+Dataset & Attack & Undefended & \nbfu & $\Delta$ ($p$) & Reference \\
+\midrule
+\multirow{3}{*}{ChestMNIST} & HF-GradInv & 0.564 & 0.805 & +0.24 (.056) & \multirow{3}{*}{0.33 [0.29, 0.36]} \\
+ & IG & 0.592 & 0.822 & +0.23 (.005) & \\
+ & GradInversion & 0.922 & floor & -- & \\
+\midrule
+\multirow{2}{*}{PathMNIST} & HF-GradInv & \TODO{} & & & \\
+ & IG & & & & \\
+\midrule
+\multirow{3}{*}{UAVScenes} & HF-GradInv & 0.470 & 0.689 & +0.22 (.108) & \multirow{3}{*}{0.54 [0.49, 0.57]} \\
+ & IG & \textbf{0.453} & 0.727 & +0.27 (.002) & \\
+ & GradInversion & 0.520 & 0.712 & +0.19 & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Read against the reference.}
+On UAV the undefended IG attack sits below the 5th percentile of the random-draw reference, so its reconstruction carries signal, and \nbfu moves it to 0.727, above the reference: the defense removes a signal that was present (\cref{tab:defense}).
+Across the 24-query language sweep, \nbfu raises target \lpips on 12 of 12 UAV queries and 11 of 12 ChestMNIST queries (69 of 72 seed pairs under best-match, 63 of 72 under Hungarian matching), and that block survives Holm correction.
+Against HF-GradInv on a single batch the direction is the same in both domains but is not separable from seed noise at $n=3$.
+On ChestMNIST the undefended attack is already above the reference, so the defended numbers show that nothing was recovered either way, not that the defense stopped a recovery.
+
+\paragraph{Noise, not clipping.}
+Clipping alone ($\sigma=0$) changes target \lpips by 0.03--0.06 in every condition, none significant; the budget sweep from $\varepsilon=0.1$ to $50$ gives the same defended values (0.80 ChestMNIST, 0.69 UAV) and so does the clipping bound from $C=0.1$ to $5$ at fixed $\varepsilon$.
+The defense is therefore the calibrated noise; clipping is what makes the noise calibratable.
+Claims at batch 16 and 32 depend on which matching is used, and we do not make them.
+
+\paragraph{Cost.}
+On these frozen-backbone heads, accuracy is unchanged down to $\varepsilon\approx10$ and drops sharply below $\varepsilon\approx5$ (supplement), so the operating point we test is at the edge of what a client would accept; a multi-round attacker averaging $T$ independent releases shrinks the noise by $\sqrt{T}$, which the supplement quantifies.

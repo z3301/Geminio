@@ -1,0 +1,61 @@
+% Supplementary material (separate upload, due Nov 23). Build standalone by uncommenting \input{sec/X_suppl} in main.tex
+% and commenting the other sections. Sources: results/heldout_rerun/summary.md (block 3), prototype/language_sweep_config.py,
+% results/complementarity/private_batch_profile_resnet18.md.
+\clearpage
+\setcounter{page}{1}
+\maketitlesupplementary
+
+\section{Language sweep}
+\label{sec:suppl_lang}
+
+\begin{table*}[h]
+\centering
+\small
+\caption{\textbf{24-query language sweep}, ResNet-18 client, held-out batches, target \lpips (mean $\pm$ 95\% CI over three seeds) without and with \nbfu at $\varepsilon=5$. Variants are grouped as paraphrase, composition, negation and surface diversity.}
+\label{tab:lang}
+\begin{tabular}{llcc}
+\toprule
+Dataset & Query & Undefended & \nbfu $\varepsilon=5$ \\
+\midrule
+\multirow{12}{*}{ChestMNIST}
+ & Any chest X-ray showing pneumonia (base) & 0.513 $\pm$ 0.050 & 0.825 $\pm$ 0.008 \\
+ & pneumonia (terse) & 0.713 $\pm$ 0.143 & 0.785 $\pm$ 0.024 \\
+ & A frontal chest radiograph demonstrating airspace consolidation consistent with pneumonia & 0.573 $\pm$ 0.070 & 0.781 $\pm$ 0.041 \\
+ & Chest imaging revealing signs of bacterial pneumonia & 0.490 $\pm$ 0.033 & 0.828 $\pm$ 0.004 \\
+ & Lung infection visible on chest radiograph (indirect) & 0.930 $\pm$ 0.070 & 0.816 $\pm$ 0.045 \\
+ & Any chest X-ray showing pneumonia and cardiomegaly & 0.497 $\pm$ 0.091 & 0.871 $\pm$ 0.092 \\
+ & Any chest X-ray showing either pneumonia or pleural effusion & 0.699 $\pm$ 0.203 & 0.831 $\pm$ 0.030 \\
+ & Any chest X-ray showing pneumonia without pleural effusion & 0.672 $\pm$ 0.091 & 0.823 $\pm$ 0.008 \\
+ & Any chest X-ray that does not show pneumonia & 0.462 $\pm$ 0.071 & 0.807 $\pm$ 0.009 \\
+ & Cualquier radiografia de torax que muestre neumonia & 0.526 $\pm$ 0.071 & 0.820 $\pm$ 0.039 \\
+ & Any chst Xray showing pneumon (typo) & 0.398 $\pm$ 0.040 & 0.824 $\pm$ 0.025 \\
+ & 30-word clinical description (long) & 0.485 $\pm$ 0.189 & 0.785 $\pm$ 0.033 \\
+\midrule
+\multirow{12}{*}{UAVScenes}
+ & aerial drone image showing solar panels on rooftops (base) & 0.509 $\pm$ 0.064 & 0.684 $\pm$ 0.036 \\
+ & solar panels (terse) & 0.457 $\pm$ 0.185 & 0.685 $\pm$ 0.016 \\
+ & high-altitude aerial photograph capturing photovoltaic panel installations atop rooftops & 0.537 $\pm$ 0.044 & 0.676 $\pm$ 0.039 \\
+ & drone view of rooftop photovoltaic installations & 0.541 $\pm$ 0.049 & 0.685 $\pm$ 0.016 \\
+ & Solar power infrastructure visible from above (indirect) & 0.510 $\pm$ 0.203 & 0.675 $\pm$ 0.036 \\
+ & aerial drone image showing solar panels on residential rooftops in a suburban neighborhood & 0.527 $\pm$ 0.037 & 0.688 $\pm$ 0.042 \\
+ & aerial drone image showing either solar panels or wind turbines & 0.544 $\pm$ 0.037 & 0.691 $\pm$ 0.057 \\
+ & aerial drone image showing solar panels without trees blocking the view & 0.510 $\pm$ 0.134 & 0.683 $\pm$ 0.050 \\
+ & aerial drone image that does not show solar panels & 0.441 $\pm$ 0.231 & 0.692 $\pm$ 0.026 \\
+ & Imagen aerea de dron mostrando paneles solares en tejados & 0.533 $\pm$ 0.067 & 0.695 $\pm$ 0.012 \\
+ & aerial dron image showing solar panles on rofotops (typo) & 0.493 $\pm$ 0.096 & 0.682 $\pm$ 0.023 \\
+ & 40-word description from a quadcopter at altitude (long) & 0.462 $\pm$ 0.153 & 0.678 $\pm$ 0.017 \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\section{Per-sample profile of every guide head}
+\label{sec:suppl_profile}
+Full version of \cref{tab:profile}: for every (dataset, guide) pair, the guide's retrieval AUROC for the target class on the auxiliary set, the target share of the last-layer gradient (bold when above the uniform 0.25), the mean probability the head assigns to the own label of the targets and of the other six images, and the mean per-image loss of each group. ResNet-18 client, held-out batch, one head per guide (\texttt{prototype/make\_profile\_table.py}).
+
+\begin{table*}[h]
+\centering
+\small
+\caption{Per-sample profile of the private batch under every ResNet-18 guide head.}
+\label{tab:profile_full}
+\input{tables/profile_full}
+\end{table*}

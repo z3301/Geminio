@@ -1,0 +1,18 @@
+{
+  "domain": "pathmnist",
+  "encoder": "clip",
+  "attacker_vlm": "biomedclip",
+  "head_type": "rigged",
+  "query": "Any colorectal histopathology image showing colorectal adenocarcinoma epithelium",
+  "query_tag": "base",
+  "base_query": "Any colorectal histopathology image showing colorectal adenocarcinoma epithelium",
+  "loss_ratio": 18.595256805419922,
+  "base_query_loss_ratio": 18.595256805419922,
+  "n_aux": 3587,
+  "epochs": 5,
+  "batch_size": 16,
+  "lr": 0.001,
+  "temperature": 100,
+  "seed": 0,
+  "head_path": "./malicious_models_client_encoder/pathmnist_clip.pt"
+}

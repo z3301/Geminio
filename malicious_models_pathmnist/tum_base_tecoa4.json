@@ -1,0 +1,65 @@
+{
+  "domain": "pathmnist",
+  "dataset": "pathmnist",
+  "query": "Any colorectal histopathology image showing colorectal adenocarcinoma epithelium",
+  "vlm": "tecoa4",
+  "temperature": 100,
+  "seed": 0,
+  "epochs": 5,
+  "batch_size": 16,
+  "n_aux": 3587,
+  "loss_ratio": 10.997037232379457,
+  "top10_highest_loss": [
+    {
+      "loss": 260.05364990234375,
+      "sim": 0.166090726852417,
+      "label": "smooth muscle"
+    },
+    {
+      "loss": 239.9630126953125,
+      "sim": 0.14933595061302185,
+      "label": "smooth muscle"
+    },
+    {
+      "loss": 236.94859313964844,
+      "sim": 0.16123580932617188,
+      "label": "smooth muscle"
+    },
+    {
+      "loss": 225.84982299804688,
+      "sim": 0.15247295796871185,
+      "label": "smooth muscle"
+    },
+    {
+      "loss": 205.71212768554688,
+      "sim": 0.1351695954799652,
+      "label": "smooth muscle"
+    },
+    {
+      "loss": 204.29969787597656,
+      "sim": 0.16759267449378967,
+      "label": "smooth muscle"
+    },
+    {
+      "loss": 193.83860778808594,
+      "sim": 0.1531018614768982,
+      "label": "smooth muscle"
+    },
+    {
+      "loss": 189.28903198242188,
+      "sim": 0.15605628490447998,
+      "label": "smooth muscle"
+    },
+    {
+      "loss": 184.0321807861328,
+      "sim": 0.15319974720478058,
+      "label": "smooth muscle"
+    },
+    {
+      "loss": 181.6228790283203,
+      "sim": 0.15789401531219482,
+      "label": "smooth muscle"
+    }
+  ],
+  "model_path": "./malicious_models_pathmnist/tum_base_tecoa4.pt"
+}

@@ -1,0 +1,18 @@
+{
+  "domain": "medical",
+  "encoder": "dinov2",
+  "attacker_vlm": "biomedclip",
+  "head_type": "rigged",
+  "query": "Any chest X-ray showing pneumonia",
+  "query_tag": "base",
+  "base_query": "Any chest X-ray showing pneumonia",
+  "loss_ratio": 11.44089126586914,
+  "base_query_loss_ratio": 11.44089126586914,
+  "n_aux": 11214,
+  "epochs": 5,
+  "batch_size": 16,
+  "lr": 0.001,
+  "temperature": 100,
+  "seed": 0,
+  "head_path": "./malicious_models_client_encoder/medical_dinov2.pt"
+}

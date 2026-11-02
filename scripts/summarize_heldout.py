@@ -38,15 +38,18 @@ def reference(cond):
     ref = re.sub(r'_dpsgd_(eps[\d.]+|cliponly)|_reclvl', '', cond)
     ref = re.sub(r'_hoC[\d.]+$', '_ho', ref)
     ref = re.sub(r'_vlm[a-z0-9]+_ho', '_vlmclip_ho', ref)
+    ref = re.sub(r'_enc([a-z0-9]+)_ce_plain$', r'_enc\1_ce', ref)   # plain head vs rigged head, same encoder
     return None if ref == cond else ref
 
 
 def block(cond):
+    if '_enc' in cond:
+        return '5. ViT-L client encoders'
     if '_vlm' in cond:
         return '2. Robust VLM as the attacker\'s guide'
     if re.search(r'_(pna|sol)_', cond):
         return '3. Language sweep'
-    if re.search(r'_(pneumonia_descriptive|solar_panels)(_ig|_gradinversion)?(_dpsgd_eps5\.0)?_ho$', cond):
+    if re.search(r'_(pneumonia_descriptive|solar_panels|tum_base)(_ig|_gradinversion)?(_dpsgd_eps5\.0)?_ho$', cond):
         return '1. Headline: NBFU eps=5 across attacks'
     return '4. Robustness checks'
 
@@ -54,6 +57,8 @@ def block(cond):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--gpu', type=int, default=None)
+    parser.add_argument('--jobs', default=JOBS, help='jobs.tsv to summarize (default: the held-out rerun list)')
+    parser.add_argument('--out-dir', default=None, help='Where summary.md / runs.csv go (default: next to --jobs)')
     args = parser.parse_args()
 
     import lpips
@@ -61,7 +66,7 @@ def main():
     lpips_fn = lpips.LPIPS(net='alex', verbose=False).to(device)
 
     order, runs = [], {}
-    for line in open(JOBS):
+    for line in open(args.jobs):
         out = line.split('\t')[0]
         name = os.path.basename(out)
         cond, seed = re.match(r'(.+)_s(\d+)$', name).groups()
@@ -80,7 +85,7 @@ def main():
 
     if not runs:
         sys.exit('No finished runs yet.')
-    out_dir = os.path.join(REPO, 'results', 'heldout_rerun')
+    out_dir = args.out_dir or os.path.dirname(os.path.abspath(args.jobs))
     with open(os.path.join(out_dir, 'runs.csv'), 'w', newline='') as f:
         rows = [r for c in order for r in runs.get(c, {}).values()]
         writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))

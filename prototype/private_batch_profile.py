@@ -26,12 +26,16 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 from prototype.client_encoder import ClipEncoderClassifier, make_head  # noqa: E402
 
+from prototype.domains import MEDICAL  # noqa: E402
+
 OUT = os.path.join(ROOT, 'results', 'complementarity', 'private_batch_profile')
 HEAD_DIR = os.path.join(ROOT, 'malicious_models_client_encoder')
-ENC = ['clip', 'simclip2', 'simclip4', 'fare2', 'fare4', 'tecoa2', 'tecoa4']
+ENC = ['clip', 'simclip2', 'simclip4', 'fare2', 'fare4', 'tecoa2', 'tecoa4', 'laion2b', 'dinov2', 'in21k']
 DOM = {
     'medical': dict(batch='assets/medical_heldout_pna', n_classes=15, swap='qeff',
                     target='pneumonia', alt='effusion'),
+    'pathmnist': dict(batch=MEDICAL['pathmnist']['batch'], n_classes=9, swap=None,
+                      target=MEDICAL['pathmnist']['target_name'], alt=None),
     'uav': dict(batch='assets/uav_heldout_solar', n_classes=18, swap='qair',
                 target='solar_board', alt='airstrip'),
 }
@@ -55,9 +59,9 @@ def load_batch(domain):
     ])
     x = torch.stack([tf(Image.open(f).convert('RGB')) for f in files])
     names = [by_file[os.path.basename(f)]['labels'] for f in files]
-    if domain == 'medical':
-        from scripts.summarize_ci import MEDICAL_CLASSES
-        y = torch.tensor([MEDICAL_CLASSES[n[0]] for n in names])
+    if domain in MEDICAL:
+        from scripts.summarize_ci import class_index
+        y = torch.tensor([class_index(domain, n[0]) for n in names])
     else:
         from prototype.dataset_uav import IDX_TO_CLASS_NAME
         idx = {v: k for k, v in IDX_TO_CLASS_NAME.items()}
@@ -70,8 +74,10 @@ def load_batch(domain):
 
 def head_paths(domain, enc):
     s = DOM[domain]['swap']
-    return {'rigged': f'{domain}_{enc}.pt', 'plain': f'{domain}_{enc}_plain.pt',
-            'swap': f'{domain}_{enc}_{s}.pt'}
+    out = {'rigged': f'{domain}_{enc}.pt', 'plain': f'{domain}_{enc}_plain.pt'}
+    if s:
+        out['swap'] = f'{domain}_{enc}_{s}.pt'
+    return out
 
 
 def per_sample(domain, logits, y, feat):
@@ -81,7 +87,7 @@ def per_sample(domain, logits, y, feat):
     output residual with its penultimate activation, so its Frobenius norm is
     the product of the two norms.
     """
-    if domain == 'medical':
+    if domain in MEDICAL:
         yl = y.long()
         p = torch.softmax(logits, dim=1)
         loss = F.cross_entropy(logits, yl, reduction='none')
@@ -145,10 +151,15 @@ def main():
 
     rows = []
     for domain, spec in DOM.items():
+        if spec['target'] is None or not os.path.isdir(os.path.join(ROOT, spec['batch'])):
+            print(f'skip {domain}: no target class or batch yet')
+            continue
         x, y, files, names = load_batch(domain)
         tgt = np.array([spec['target'] in n for n in names])
-        alt = np.array([spec['alt'] in n for n in names])
+        alt = np.array([spec['alt'] in n for n in names]) if spec['alt'] else np.zeros(len(names), bool)
         for enc in ENC:
+            if not any(os.path.exists(os.path.join(HEAD_DIR, f)) for f in head_paths(domain, enc).values()):
+                continue
             model = ClipEncoderClassifier(enc, num_classes=spec['n_classes']).to(device).eval()
             with torch.no_grad():
                 h = model.encode(x.to(device))
@@ -164,6 +175,7 @@ def main():
                     logits = head[4](feat)
                 loss, own, gnorm = per_sample(domain, logits.float(), y.to(device).float()
                                               if domain == 'uav' else y.to(device), feat.float())
+                # 'gnorm' is the last-layer weight-gradient norm; 'share' its fraction of the batch total
                 share = gnorm / gnorm.sum()
                 for i, f in enumerate(files):
                     rows.append(dict(domain=domain, encoder=enc, head=arm, image=f,

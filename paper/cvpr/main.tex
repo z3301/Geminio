@@ -1,0 +1,69 @@
+% CVPR 2027 submission. Style files from https://github.com/cvpr-org/author-kit (cvpr.sty, ieeenat_fullname.bst).
+% Build:  cd paper/cvpr && pdflatex main && bibtex main && pdflatex main && pdflatex main
+% Sections live in sec/; numbers are read from the results/ tables named in each section's header comment.
+\documentclass[10pt,twocolumn,letterpaper]{article}
+
+%%%%%%%%% PAPER TYPE
+% \usepackage{cvpr}              % camera-ready
+\usepackage[review]{cvpr}      % review version (anonymous, line numbers)
+% \usepackage[pagenumbers]{cvpr} % arXiv
+
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{xspace}
+\usepackage{caption}
+\usepackage{xcolor}
+\newcommand{\TODO}[1]{\textbf{\color{red}[TODO: #1]}}
+% \renewcommand{\TODO}[1]{}   % uncomment for submission
+\newcommand{\geminio}{Geminio\xspace}
+\newcommand{\nbfu}{NBFU\xspace}
+\newcommand{\lpips}{LPIPS\xspace}
+\newcommand{\pneu}{pneumonia\xspace}
+\DeclareMathOperator*{\argmin}{arg\,min}
+
+\definecolor{cvprblue}{rgb}{0.21,0.49,0.74}
+\usepackage[pagebackref,breaklinks,colorlinks,allcolors=cvprblue]{hyperref}
+
+\def\confName{CVPR}
+\def\confYear{2027}
+
+\title{Retrieval Selects, Robustness Reveals:\\Two Factors Behind Language-Guided Gradient Inversion in Federated Learning}
+
+% TODO(author list, lock by Nov 10 registration): order and affiliations to be agreed with Zarif and Ahmed.
+\author{Dan Zimmerman\\
+Florida Atlantic University\\
+{\tt\small dzimmerman2021@fau.edu}
+\and
+Md Zarif Hossain\\
+Southern Illinois University\\
+\and
+Ahmed Imteaj\\
+Southern Illinois University\\
+\and
+George Sklivanitis\\
+Florida Atlantic University\\
+}
+
+\begin{document}
+\maketitle
+\input{sec/0_abstract}
+\input{sec/1_intro}
+\input{sec/2_related}
+\input{sec/3_background}
+\input{sec/4_setup}
+\input{sec/5_results}
+\input{sec/6_defense}
+\input{sec/7_discussion}
+\input{sec/8_llm_statement}
+{
+    \small
+    \bibliographystyle{ieeenat_fullname}
+    \bibliography{../custom}
+}
+
+% Supplementary pages are submitted separately (Nov 23); keep them out of the main PDF.
+% \input{sec/X_suppl}
+
+\end{document}

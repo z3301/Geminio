@@ -1,0 +1,28 @@
+% Discussion, limitations, conclusion. Limits follow results/{plain_head,query_swap,temp_sweep,complementarity}/README.md
+% "Limits of this control" sections (independent review 2026-10-27).
+\section{Discussion}
+\label{sec:discussion}
+
+\paragraph{What the two factors buy an attacker and a defender.}
+For the attacker, the guide is the bottleneck: \geminio's loss ratio certifies that a head is rigged, not that it is rigged for the right images, and a guide that cannot retrieve the class on the attacker's own auxiliary pool (chest X-rays at 64\,px for every CLIP variant; solar panels for TeCoA-4) produces a head that spends the gradient elsewhere.
+Domain guides help when they retrieve (BiomedCLIP on histology) and not otherwise (BiomedCLIP on ChestMNIST, AUROC 0.64).
+For the defender, two conclusions follow. First, adversarial robustness in the client backbone is not neutral: with a selecting head it concentrates the leakage on the images the attacker asked for, in proportion to the robustness level. Second, the retrieval failure that protects ChestMNIST here is an accident of resolution and class, not a property of medical imaging, and it should not be relied on.
+
+\paragraph{Robust guides.}
+The ChestMNIST guide effect (\cref{sec:guide}) is real and survives correction, but it is a whole-batch effect carried by the loss regime the robust-guide heads land in, not by selection.
+We report it because the \geminio protocol would count it as the attack getting stronger, and because a reader of the loss ratio alone would conclude the opposite of what the private batch shows.
+
+\paragraph{Limitations.}
+Every condition uses one private batch per dataset; seeds vary the reconstruction optimizer, not the data, so the paired contrasts generalize to other batches only by assumption.
+The gradient share is computed for the head's last layer; the full gradient includes the backbone, whose per-sample decomposition we did not measure.
+Medical images are 64\,px MedMNIST renderings, which compresses \lpips and is part of why no chest X-ray configuration clears the reference; higher-resolution data may move both the attack and the reference.
+Three seeds per condition leave several directionally consistent effects unresolved, and the Wilcoxon tests over seven encoders have a floor of $p=.016$.
+The honest-head control removes both query weighting and per-batch loss normalization at once; a uniform-weight head would isolate the weighting.
+We did not run generative-prior attacks (GIFD, GUIDE) or the real SLADE checkpoints, whose public weights are copies of Sim-CLIP's.
+
+\section{Conclusion}
+\label{sec:conclusion}
+Language-guided gradient inversion leaks what its guide can retrieve and what its client backbone can invert.
+Measured on the private batch, the rigged head selects its targets only when the guiding VLM ranks the target class well, and adversarially fine-tuned client backbones turn that selection into reconstructions in proportion to their robustness.
+Where the guide fails, as it does for pneumonia on 64\,px chest X-rays under every CLIP variant we tested, the attack never selects the targets and recovers nothing a random draw would not; where it succeeds, calibrated noise on clipped updates removes the recovery while clipping alone does not.
+We release the pipeline, the held-out batches, the per-sample profiles and the reference baselines so that future language-guided attacks are evaluated against what their heads actually select.

@@ -1,0 +1,18 @@
+{
+  "domain": "uav",
+  "encoder": "dinov2",
+  "attacker_vlm": "clip",
+  "head_type": "rigged",
+  "query": "aerial drone image showing solar panels on rooftops",
+  "query_tag": "base",
+  "base_query": "aerial drone image showing solar panels on rooftops",
+  "loss_ratio": 258.39508056640625,
+  "base_query_loss_ratio": 258.39508056640625,
+  "n_aux": 2014,
+  "epochs": 5,
+  "batch_size": 16,
+  "lr": 0.001,
+  "temperature": 100,
+  "seed": 0,
+  "head_path": "./malicious_models_client_encoder/uav_dinov2.pt"
+}

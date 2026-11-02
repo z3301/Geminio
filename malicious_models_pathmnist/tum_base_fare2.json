@@ -1,0 +1,65 @@
+{
+  "domain": "pathmnist",
+  "dataset": "pathmnist",
+  "query": "Any colorectal histopathology image showing colorectal adenocarcinoma epithelium",
+  "vlm": "fare2",
+  "temperature": 100,
+  "seed": 0,
+  "epochs": 5,
+  "batch_size": 16,
+  "n_aux": 3587,
+  "loss_ratio": 30.381326521439448,
+  "top10_highest_loss": [
+    {
+      "loss": 305.6637268066406,
+      "sim": 0.26027482748031616,
+      "label": "colorectal adenocarcinoma epithelium"
+    },
+    {
+      "loss": 256.714599609375,
+      "sim": 0.27600857615470886,
+      "label": "colorectal adenocarcinoma epithelium"
+    },
+    {
+      "loss": 236.74346923828125,
+      "sim": 0.2705538868904114,
+      "label": "colorectal adenocarcinoma epithelium"
+    },
+    {
+      "loss": 214.21835327148438,
+      "sim": 0.26567181944847107,
+      "label": "colorectal adenocarcinoma epithelium"
+    },
+    {
+      "loss": 213.56201171875,
+      "sim": 0.27510127425193787,
+      "label": "colorectal adenocarcinoma epithelium"
+    },
+    {
+      "loss": 198.3916015625,
+      "sim": 0.25894981622695923,
+      "label": "colorectal adenocarcinoma epithelium"
+    },
+    {
+      "loss": 194.7254638671875,
+      "sim": 0.27127504348754883,
+      "label": "colorectal adenocarcinoma epithelium"
+    },
+    {
+      "loss": 182.56405639648438,
+      "sim": 0.26887696981430054,
+      "label": "colorectal adenocarcinoma epithelium"
+    },
+    {
+      "loss": 181.85537719726562,
+      "sim": 0.2653968334197998,
+      "label": "colorectal adenocarcinoma epithelium"
+    },
+    {
+      "loss": 179.54141235351562,
+      "sim": 0.27588579058647156,
+      "label": "colorectal adenocarcinoma epithelium"
+    }
+  ],
+  "model_path": "./malicious_models_pathmnist/tum_base_fare2.pt"
+}

@@ -1,0 +1,65 @@
+{
+  "domain": "pathmnist",
+  "dataset": "pathmnist",
+  "query": "Any colorectal histopathology image showing colorectal adenocarcinoma epithelium",
+  "vlm": "biomedclip",
+  "temperature": 100,
+  "seed": 0,
+  "epochs": 5,
+  "batch_size": 16,
+  "n_aux": 3587,
+  "loss_ratio": 28.008553366265936,
+  "top10_highest_loss": [
+    {
+      "loss": 573.427490234375,
+      "sim": 0.46247440576553345,
+      "label": "normal colon mucosa"
+    },
+    {
+      "loss": 568.2720336914062,
+      "sim": 0.45477914810180664,
+      "label": "normal colon mucosa"
+    },
+    {
+      "loss": 562.0826416015625,
+      "sim": 0.4179370403289795,
+      "label": "normal colon mucosa"
+    },
+    {
+      "loss": 543.9967041015625,
+      "sim": 0.42870157957077026,
+      "label": "normal colon mucosa"
+    },
+    {
+      "loss": 527.7547607421875,
+      "sim": 0.43224775791168213,
+      "label": "normal colon mucosa"
+    },
+    {
+      "loss": 522.3566284179688,
+      "sim": 0.41719168424606323,
+      "label": "normal colon mucosa"
+    },
+    {
+      "loss": 510.3884582519531,
+      "sim": 0.4419689178466797,
+      "label": "normal colon mucosa"
+    },
+    {
+      "loss": 482.9607849121094,
+      "sim": 0.4441181421279907,
+      "label": "normal colon mucosa"
+    },
+    {
+      "loss": 469.99798583984375,
+      "sim": 0.4570557475090027,
+      "label": "normal colon mucosa"
+    },
+    {
+      "loss": 458.7620849609375,
+      "sim": 0.4116538166999817,
+      "label": "normal colon mucosa"
+    }
+  ],
+  "model_path": "./malicious_models_pathmnist/tum_base.pt"
+}

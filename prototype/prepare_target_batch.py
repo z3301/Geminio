@@ -33,23 +33,33 @@ PNEUMONIA = 6         # ChestMNIST info['label']: 6 = pneumonia, 7 = pneumothora
 SOLAR_BOARD_IDX = 11  # UAVScenes contiguous class index for solar_board
 
 
-def medical_batch(rng, n_target, n_total):
-    from prototype.dataset_medical import GeminioChestMNIST
-    held = GeminioChestMNIST(root='./data', split='test', train=False, transform=None, size=64,
-                             embed_path='./data/medical-biomedclip-test.pt')
-    train = GeminioChestMNIST(root='./data', split='test', train=True, transform=None, size=64,
-                              embed_path='./data/medical-biomedclip-test.pt')
+def medmnist_batch(rng, n_target, n_total, domain='medical', target_cls=None):
+    """n_target images of the target class plus one image per other class (cycling), all held-out."""
+    from prototype.dataset_medical import GeminioChestMNIST, GeminioMedMNIST
+    from prototype.domains import MEDICAL, embed_path
+    spec = MEDICAL[domain]
+    target_cls = spec['target'] if target_cls is None else target_cls
+    assert target_cls is not None, f'{domain}: target class not set'
+    kw = dict(root='./data', split='test', transform=None, size=64, embed_path=embed_path(domain, spec['attacker_vlm']))
+    if domain == 'medical':
+        held, train = GeminioChestMNIST(train=False, **kw), GeminioChestMNIST(train=True, **kw)
+    else:
+        held = GeminioMedMNIST(train=False, flag=spec['flag'], **kw)
+        train = GeminioMedMNIST(train=True, flag=spec['flag'], **kw)
     held_idx = np.asarray(held.samples)
     assert not set(held_idx.tolist()) & set(train.samples), 'held-out and train halves overlap'
     targets = np.asarray(held.targets)
     label_names = {int(k): v for k, v in held.label_names.items()}
-    label_names[14] = 'normal'
-    assert label_names[PNEUMONIA] == 'pneumonia', label_names
+    if domain == 'medical':
+        label_names[14] = 'normal'
+        assert label_names[PNEUMONIA] == 'pneumonia', label_names
+    print(f'{domain}: target class {target_cls} = {label_names[target_cls]!r}, '
+          f'{int((targets[held_idx] == target_cls).sum())} held-out candidates')
 
-    chosen = [int(i) for i in rng.choice(held_idx[targets[held_idx] == PNEUMONIA], n_target, replace=False)]
+    chosen = [int(i) for i in rng.choice(held_idx[targets[held_idx] == target_cls], n_target, replace=False)]
     # One image per other class, cycling through the classes again when the batch
-    # needs more non-targets than there are classes (14 non-pneumonia classes).
-    other_classes = rng.permutation([int(c) for c in sorted(set(targets[held_idx].tolist())) if c != PNEUMONIA])
+    # needs more non-targets than there are classes (14 non-pneumonia classes for ChestMNIST).
+    other_classes = rng.permutation([int(c) for c in sorted(set(targets[held_idx].tolist())) if c != target_cls])
     for k in range(n_total - n_target):
         cls = other_classes[k % len(other_classes)]
         pool = [int(i) for i in held_idx[targets[held_idx] == cls] if int(i) not in chosen]
@@ -61,8 +71,12 @@ def medical_batch(rng, n_target, n_total):
         target = int(targets[idx])
         img = Image.fromarray(held.images[idx]).convert('RGB').resize((224, 224), Image.BILINEAR)
         items.append(dict(image=img, tag=str(target), dataset_index=idx, labels=[label_names[target]],
-                          is_target=target == PNEUMONIA))
+                          is_target=target == target_cls))
     return items, None
+
+
+def medical_batch(rng, n_target, n_total):
+    return medmnist_batch(rng, n_target, n_total, 'medical', PNEUMONIA)
 
 
 def uav_batch(rng, n_target, n_total):
@@ -93,19 +107,23 @@ def uav_batch(rng, n_target, n_total):
 
 def main():
     parser = argparse.ArgumentParser(description='Write a held-out private batch with attack targets')
-    parser.add_argument('--domain', required=True, choices=['medical', 'uav'])
+    parser.add_argument('--domain', required=True, choices=['medical', 'pathmnist', 'uav'])
     parser.add_argument('--out', required=True)
     parser.add_argument('--n-target', type=int, default=2)
     parser.add_argument('--n-total', type=int, default=8)
     parser.add_argument('--seed', type=int, default=0)
+    parser.add_argument('--target-class', type=int, default=None,
+                        help='Medical domains: class index of the attack target (default: prototype.domains)')
     args = parser.parse_args()
 
     if os.path.isdir(args.out) and os.listdir(args.out):
         sys.exit(f'{args.out} is not empty; refusing to mix with existing files')
     os.makedirs(args.out, exist_ok=True)
     rng = np.random.default_rng(args.seed)
-    builder = medical_batch if args.domain == 'medical' else uav_batch
-    items, label_matrix = builder(rng, args.n_target, args.n_total)
+    if args.domain == 'uav':
+        items, label_matrix = uav_batch(rng, args.n_target, args.n_total)
+    else:
+        items, label_matrix = medmnist_batch(rng, args.n_target, args.n_total, args.domain, args.target_class)
 
     manifest = []
     for i, it in enumerate(items):

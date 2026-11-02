@@ -1,0 +1,71 @@
+{
+  "domain": "pathmnist",
+  "seed": 0,
+  "split": "held-out (train=False)",
+  "samples": [
+    {
+      "file": "0-4.png",
+      "dataset_index": 5437,
+      "labels": [
+        "mucus"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "1-8.png",
+      "dataset_index": 5755,
+      "labels": [
+        "colorectal adenocarcinoma epithelium"
+      ],
+      "is_target": true
+    },
+    {
+      "file": "2-5.png",
+      "dataset_index": 5785,
+      "labels": [
+        "smooth muscle"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "3-3.png",
+      "dataset_index": 5792,
+      "labels": [
+        "lymphocytes"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "4-8.png",
+      "dataset_index": 6608,
+      "labels": [
+        "colorectal adenocarcinoma epithelium"
+      ],
+      "is_target": true
+    },
+    {
+      "file": "5-1.png",
+      "dataset_index": 5733,
+      "labels": [
+        "background"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "6-2.png",
+      "dataset_index": 7076,
+      "labels": [
+        "debris"
+      ],
+      "is_target": false
+    },
+    {
+      "file": "7-6.png",
+      "dataset_index": 6284,
+      "labels": [
+        "normal colon mucosa"
+      ],
+      "is_target": false
+    }
+  ]
+}

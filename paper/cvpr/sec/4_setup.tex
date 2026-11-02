@@ -1,0 +1,31 @@
+% Experimental setup. Sources: results/heldout_rerun/summary.md (348 runs), results/client_encoder/summary.md (48),
+% results/client_encoder_plain, results/client_encoder_swap_qair_qeff, results/pathmnist/README.md,
+% results/complementarity/floor_baselines.md, assets/*_manifest.json.
+\section{Experimental Setup}
+\label{sec:setup}
+
+\paragraph{Datasets and queries.}
+ChestMNIST (64\,px chest X-rays, 14 findings plus ``normal'', 22{,}433 test images)~\cite{medmnistv2} with the query ``any chest X-ray showing pneumonia'';
+PathMNIST (64\,px colorectal histology, 9 tissue classes, 7{,}180 test images)~\cite{medmnistv2} with the query ``any colorectal histopathology image showing colorectal adenocarcinoma epithelium'';
+and UAVScenes (drone frames from two scenes with 18 semantic classes)~\cite{uavscenes2024} with the query ``aerial drone image showing solar panels on rooftops''.
+In each dataset the first half of every class is the attacker's auxiliary pool and the second half is held out; private batches are drawn from the held-out half only and contain two target images among eight, with the six others from distinct classes.
+The PathMNIST target class was fixed from a retrieval scan of all nine classes under all eight guides before any attack ran: it is the clinically sensitive class, and the guides spread from 0.54 to 0.87 AUROC on it.
+
+\paragraph{Attacker configurations.}
+Guides: BiomedCLIP for the two medical datasets, vanilla CLIP for UAV, and the six robust CLIPs in every dataset (eight guides for medical, seven for UAV).
+Client models: a ResNet-18 with the \geminio head (512$\to$256$\to$64$\to$C), and the ten ViT-L encoders of \cref{sec:background} with the same head on their pooled features (inputs stay ImageNet-normalized and are re-normalized inside the model).
+Rigged heads are trained on cached backbone features for 5 epochs with Adam ($10^{-3}$), $T=100$, batch 16, seed 0; honest heads identically with the mean loss; swapped-query heads with a second query of a class present in the batch (pleural effusion; airport runway).
+Reconstruction: HF-GradInv for 24{,}000 iterations with its layer window scaled to each architecture's parameter count, plus IG and GradInversion for the defense comparison; seeds 42, 123 and 256 per condition.
+BatchNorm runs in evaluation mode with the public running statistics, the \geminio default; the training-mode variant is reported as a robustness check.
+
+\paragraph{Metrics.}
+\geminio's attack F1 counts a reconstruction as a hit when its last-layer gradient has cosine similarity above 0.9 with the true one; with the true label fed to both sides it scores pure-noise reconstructions at 1.0, so we do not use it.
+We report \emph{target \lpips}, the \lpips distance~\cite{lpips2018} between each target image and its best-matching reconstruction (lower is more leakage), the same for non-targets, and \emph{selectivity}, non-target minus target \lpips (positive when the targets come out better).
+Because best-match lets several images share one reconstruction (it does so in 37\% of runs), every table also carries the one-to-one Hungarian assignment that minimizes total \lpips.
+\emph{Gradient share} is the fraction of the batch's last-layer weight-gradient norm, $\|p_i-y_i\|\,\|r_i\|$, that the two targets receive; the uniform value is 0.25.
+\emph{Reference values}: eight images drawn at random from the auxiliary half and scored through the same matching code, 50 draws per batch, give the target \lpips and selectivity an uninformative reconstruction obtains (ChestMNIST 0.327 [5th--95th percentile 0.294, 0.361]; UAV 0.535 [0.485, 0.571]; PathMNIST \TODO{fill}). Only values below the 5th percentile evidence recovery; paired contrasts are unaffected, because the reference depends only on the batch.
+
+\paragraph{Statistics.}
+Conditions are compared seed by seed with paired $t$-tests ($n=3$, $df=2$) and, across encoders or queries, with Wilcoxon signed-rank tests whose floor at seven encoders is $p=.016$.
+We state as findings only effects that survive Holm correction within their table or hold on every seed pair; everything else is given with its direction and $n$.
+Every condition uses one private batch per dataset, so the seeds vary the reconstruction optimizer, not the data; we flag this in \cref{sec:discussion}.

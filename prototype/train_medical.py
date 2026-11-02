@@ -89,12 +89,16 @@ MEDICAL_QUERIES = [
 
 def train_query(query, device, epochs=5, batch_size=16, num_workers=4,
                 temperature=100, output_dir='./malicious_models_medical',
-                pseudo_labels_path=None, vlm='biomedclip', seed=None):
+                pseudo_labels_path=None, vlm='biomedclip', seed=None, domain='medical', name=None):
     """Train a malicious model for a single medical query.
 
     seed: if given, seeds torch/numpy before model init so head initialization and batch order are
           reproducible (the saved filename does not encode the seed).
+    domain: 'medical' (ChestMNIST) or another key of prototype.domains.MEDICAL, e.g. 'pathmnist'.
+    name: file stem to save under instead of the query text (a JSON sidecar records the query).
     """
+    from prototype.domains import MEDICAL, embed_path as domain_embed_path
+    from prototype.dataset_medical import GeminioMedMNIST
     if seed is not None:
         import random
         random.seed(seed)
@@ -115,21 +119,26 @@ def train_query(query, device, epochs=5, batch_size=16, num_workers=4,
     ])
 
     # Resolve embedding file for selected VLM
-    embed_filename = EMBED_PATHS.get(vlm)
-    if embed_filename is None:
+    if vlm not in EMBED_PATHS:
         raise ValueError(f"Unknown VLM: {vlm}. Choose from: {list(EMBED_PATHS.keys())}")
-    embed_path = os.path.join('./data', embed_filename)
+    embed_path = domain_embed_path(domain, vlm, './data')
     if not os.path.exists(embed_path):
         raise FileNotFoundError(
             f"Embeddings not found: {embed_path}\n"
-            f"Run: python prototype/compute_embeddings.py --domain medical --vlm {vlm} --gpu 0"
+            f"Run: python prototype/compute_embeddings.py --domain {domain} --vlm {vlm} --gpu 0"
         )
 
     # Load dataset with VLM-specific embeddings
-    dataset = GeminioChestMNIST(
-        root='./data', split='test', train=True, transform=transform, size=64,
-        embed_path=embed_path
-    )
+    if domain == 'medical':
+        dataset = GeminioChestMNIST(
+            root='./data', split='test', train=True, transform=transform, size=64,
+            embed_path=embed_path
+        )
+    else:
+        dataset = GeminioMedMNIST(
+            root='./data', split='test', train=True, transform=transform, size=64,
+            embed_path=embed_path, flag=MEDICAL[domain]['flag']
+        )
     dataloader = torch.utils.data.DataLoader(
         dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers
     )
@@ -184,7 +193,7 @@ def train_query(query, device, epochs=5, batch_size=16, num_workers=4,
 
     # Save model
     os.makedirs(output_dir, exist_ok=True)
-    safe_name = query.replace(' ', '_').replace('?', '').replace('"', '')
+    safe_name = name or query.replace(' ', '_').replace('?', '').replace('"', '')
     # Include VLM, temperature, and pseudo-label info in filename for tracking
     suffix = ''
     if vlm != 'biomedclip':
@@ -226,7 +235,8 @@ def train_query(query, device, epochs=5, batch_size=16, num_workers=4,
     top_loss_idx = np.argsort(all_losses)[-10:][::-1]
     label_names = dataset.label_names
     label_names_ext = {int(k): v for k, v in label_names.items()}
-    label_names_ext[14] = 'normal'
+    if domain == 'medical':
+        label_names_ext[14] = 'normal'
 
     print(f"\nTop-10 highest-loss images (will dominate gradient):")
     for rank, idx in enumerate(top_loss_idx):
@@ -238,10 +248,20 @@ def train_query(query, device, epochs=5, batch_size=16, num_workers=4,
     high_sim_mask = all_sims >= sim_threshold
     low_sim_mask = all_sims < sim_threshold
 
+    loss_ratio = float(all_losses[high_sim_mask].mean() / all_losses[low_sim_mask].mean())
     print(f"\nLoss surface analysis (sim threshold={sim_threshold:.4f}):")
     print(f"  High-similarity images (top 10%): avg loss = {all_losses[high_sim_mask].mean():.4f}")
     print(f"  Low-similarity images (bottom 90%): avg loss = {all_losses[low_sim_mask].mean():.4f}")
-    print(f"  Ratio: {all_losses[high_sim_mask].mean() / all_losses[low_sim_mask].mean():.2f}x")
+    print(f"  Ratio: {loss_ratio:.2f}x")
+
+    # Sidecar with the training provenance (the filename does not encode query, seed or dataset)
+    import json
+    top = [dict(loss=float(all_losses[i]), sim=float(all_sims[i]),
+                label=label_names_ext.get(int(all_labels[i]), f'class_{int(all_labels[i])}')) for i in top_loss_idx]
+    with open(model_path[:-3] + '.json', 'w') as f:
+        json.dump(dict(domain=domain, dataset=MEDICAL[domain]['flag'], query=query, vlm=vlm, temperature=temperature,
+                       seed=seed, epochs=epochs, batch_size=batch_size, n_aux=len(dataset), loss_ratio=loss_ratio,
+                       top10_highest_loss=top, model_path=model_path), f, indent=2)
 
     return model_path
 
@@ -259,19 +279,25 @@ def main():
                         choices=['biomedclip', 'clip', 'simclip4', 'simclip2', 'fare4', 'fare2', 'tecoa4', 'tecoa2', 'slade4', 'slade2'],
                         help='VLM backend for text-image similarity (default: biomedclip)')
     parser.add_argument('--seed', type=int, default=None, help='Seed for head init and batch order (default: unseeded)')
+    parser.add_argument('--dataset', type=str, default='medical', choices=['medical', 'pathmnist'],
+                        help='Medical dataset: medical = ChestMNIST (default), pathmnist = PathMNIST')
+    parser.add_argument('--name', type=str, default=None,
+                        help='File stem for the saved head instead of the query text')
     args = parser.parse_args()
 
     device = f'cuda:{args.gpu}' if torch.cuda.is_available() else 'cpu'
+    if args.dataset != 'medical' and args.output_dir == './malicious_models_medical':
+        args.output_dir = f'./malicious_models_{args.dataset}'
 
     if args.all:
         for query in MEDICAL_QUERIES:
             train_query(query, device, epochs=args.epochs, temperature=args.temperature,
                        output_dir=args.output_dir, pseudo_labels_path=args.pseudo_labels,
-                       vlm=args.vlm, seed=args.seed)
+                       vlm=args.vlm, seed=args.seed, domain=args.dataset)
     elif args.query:
         train_query(args.query, device, epochs=args.epochs, temperature=args.temperature,
                    output_dir=args.output_dir, pseudo_labels_path=args.pseudo_labels,
-                   vlm=args.vlm, seed=args.seed)
+                   vlm=args.vlm, seed=args.seed, domain=args.dataset, name=args.name)
     else:
         # Default: train the first query as a demo
         train_query(MEDICAL_QUERIES[0], device, epochs=args.epochs, temperature=args.temperature,

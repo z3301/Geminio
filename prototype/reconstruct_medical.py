@@ -29,6 +29,7 @@ from core.dataset import CustomData
 from prototype.defenses import apply_gradient_pruning, apply_gradient_noise, apply_dpsgd, simulate_fedavg
 from prototype.client_encoder import (CLIENT_ENCODERS, ClipEncoderClassifier, hfgradinv_layer_window,
                                       use_double_backward_safe_attention)
+from prototype.domains import MEDICAL
 import breaching
 from omegaconf import open_dict
 import subprocess
@@ -145,9 +146,9 @@ def reconstruct_medical(cfg, setup, query=None, prune_rate=0.0, noise_scale=0.0,
                         fedavg_epochs=0, fedavg_lr=1e-3,
                         data_dir='./assets/medical_samples/', model_path=None,
                         freeze_backbone=False, multi_round_T=1, client_encoder=None, seed=None,
-                        record_level=None):
+                        record_level=None, dataset='medical'):
     """Reconstruct private medical images using baseline or query-based approach."""
-    # Initialize model (ResNet18, 15 classes for ChestMNIST)
+    # Initialize model (ResNet18; 15 classes for ChestMNIST, cfg.case.data.classes for other datasets)
     if client_encoder:
         # FL client model built on a CLIP-family ViT-L/14 encoder (prototype/client_encoder.py)
         model = ClipEncoderClassifier(encoder=client_encoder, num_classes=cfg.case.data.classes)
@@ -305,12 +306,15 @@ def reconstruct_medical(cfg, setup, query=None, prune_rate=0.0, noise_scale=0.0,
     metrics['dpsgd_max_grad_norm'] = dpsgd_max_grad_norm
     metrics['fedavg_epochs'] = fedavg_epochs
     metrics['fedavg_lr'] = fedavg_lr
-    metrics['domain'] = 'medical'
+    metrics['domain'] = dataset
+    metrics['dataset'] = MEDICAL[dataset]['flag']
     metrics['client_encoder'] = client_encoder or 'resnet18'
     metrics['attack'] = cfg.attack.get('type', 'unknown')
     # Provenance, so the run can be traced without its stdout log
     metrics['provenance'] = {
         'seed': seed,
+        'dataset': MEDICAL[dataset]['flag'],
+        'num_classes': int(cfg.case.data.classes),
         'data_dir': data_dir,
         'num_samples': int(cfg.case.user.num_data_points),
         'model_path': model_path,
@@ -378,10 +382,14 @@ if __name__ == '__main__':
                         help='Multi-round adaptive attacker: average T independent NBFU releases (effective sigma -> sigma/sqrt(T))')
     parser.add_argument('--dpsgd-record-level', action='store_true',
                         help='Use record-level DP-SGD: per-example clipping to C plus calibrated Gaussian noise with sensitivity 2C/B. Bypasses --dpsgd-epsilon (use --dpsgd-epsilon to set the budget); --dpsgd-max-grad-norm gives C.')
+    parser.add_argument('--dataset', type=str, default='medical', choices=sorted(MEDICAL),
+                        help='Medical dataset: medical = ChestMNIST (15 classes, default), pathmnist = PathMNIST (9). '
+                             'Sets the class count and the results/{dataset}_ prefix; the ImageNet normalization is shared.')
     args = parser.parse_args()
 
     # Initialize configuration
     cfg = breaching.get_config(overrides=["case=geminio_medical", f"attack={args.attack}"])
+    cfg.case.data.classes = MEDICAL[args.dataset]['n_classes']
     cfg.case.user.num_data_points = args.num_samples
     cfg.case.data.partition = "none"
     cfg.case.data.batch_size = args.num_samples
@@ -445,7 +453,7 @@ if __name__ == '__main__':
         defense_tag += f'_enc{args.client_encoder}'
         use_double_backward_safe_attention()
     batch_tag = f'_{args.batch_tag}' if args.batch_tag else ''
-    cfg.attack.save_dir = f'./results/medical_{query_tag}{attack_tag}{defense_tag}{batch_tag}/'
+    cfg.attack.save_dir = f'./results/{args.dataset}_{query_tag}{attack_tag}{defense_tag}{batch_tag}/'
 
     device = torch.device(f'cuda:{args.gpu}') if torch.cuda.is_available() else torch.device('cpu')
     torch.backends.cudnn.benchmark = cfg.case.impl.benchmark
@@ -471,4 +479,4 @@ if __name__ == '__main__':
                         freeze_backbone=args.freeze_backbone,
                         multi_round_T=args.multi_round_T,
                         client_encoder=args.client_encoder, seed=args.seed,
-                        record_level=record_level)
+                        record_level=record_level, dataset=args.dataset)

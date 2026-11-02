@@ -21,9 +21,11 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, 'scripts'))
 from summarize_ci import match_metrics, target_mask, to_unit  # noqa: E402
+from prototype.domains import MEDICAL  # noqa: E402
 
 OUT = os.path.join(ROOT, 'results', 'complementarity', 'floor_baselines')
 RUN = {'medical': 'results/medical_pna_base_encclip_ce_s42',
+       'pathmnist': 'results/pathmnist_tum_base_ho_s42',
        'uav': 'results/uav_sol_base_encclip_ce_s42'}
 KEYS = ['target_lpips', 'selectivity', 'target_lpips_hung', 'selectivity_hung',
         'nontarget_lpips', 'n_unique_best']
@@ -35,11 +37,12 @@ def _to224(pil):
 
 def sample_images(domain, rng, n):
     """n images drawn from the head-training half of the domain's dataset."""
-    if domain == 'medical':
-        from prototype.dataset_medical import GeminioChestMNIST
-        ds = GeminioChestMNIST(root=os.path.join(ROOT, 'data'), split='test', train=True,
-                               transform=None, size=64,
-                               embed_path=os.path.join(ROOT, 'data', 'medical-biomedclip-test.pt'))
+    if domain in MEDICAL:
+        from prototype.dataset_medical import GeminioChestMNIST, GeminioMedMNIST
+        from prototype.domains import embed_path
+        kw = dict(root=os.path.join(ROOT, 'data'), split='test', train=True, transform=None, size=64,
+                  embed_path=embed_path(domain, MEDICAL[domain]['attacker_vlm'], os.path.join(ROOT, 'data')))
+        ds = GeminioChestMNIST(**kw) if domain == 'medical' else GeminioMedMNIST(flag=MEDICAL[domain]['flag'], **kw)
         idx = rng.choice(len(ds.samples), n, replace=False)
         return torch.stack([_to224(Image.fromarray(ds.images[ds.samples[i]])) for i in idx])
     from prototype.dataset_uav import GeminioUAVScenes
@@ -93,6 +96,9 @@ def main():
              'head-training half (mean over draws, with the 5th and 95th percentile). '
              'A reported target LPIPS is informative only below these values.', '']
     for domain, run in RUN.items():
+        if not os.path.exists(os.path.join(ROOT, run, 'true_data.pt')):
+            print(f'skip {domain}: {run} has no true_data.pt yet')
+            continue
         true = torch.load(os.path.join(ROOT, run, 'true_data.pt'), map_location='cpu',
                           weights_only=True)
         gt = to_unit(true['data'])

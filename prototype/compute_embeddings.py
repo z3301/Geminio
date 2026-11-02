@@ -38,18 +38,39 @@ UAV_DATA_ROOT = '/raid/scratch/dzimmerman2021/uavscenes'
 UAV_SCENES = ['interval5_AMtown01', 'interval5_HKairport01']
 
 
-def compute_medical_embeddings(vlm, device, batch_size=64):
-    """Compute image embeddings for ChestMNIST test set."""
-    import medmnist
-    from medmnist import ChestMNIST
+def _biomedclip(device):
+    """BiomedCLIP model + preprocess (the medical pipeline's original guide)."""
+    import open_clip
+    from prototype.vlm_medical import BIOMEDCLIP_NAME
+    model, _, preprocess = open_clip.create_model_and_transforms(BIOMEDCLIP_NAME)
+    return model.to(device).eval(), preprocess
 
+
+def compute_medical_embeddings(vlm, device, batch_size=64, domain='medical'):
+    """Compute image embeddings for a MedMNIST test set (ChestMNIST by default)."""
+    import medmnist
+    from medmnist import INFO
+    from prototype.domains import MEDICAL, embed_path
+
+    flag = MEDICAL[domain]['flag']
     medmnist_root = os.path.join(MEDICAL_DATA_ROOT, 'medmnist')
-    dataset = ChestMNIST(split='test', download=True, root=medmnist_root, size=64)
+    dataset = getattr(medmnist, INFO[flag]['python_class'])(split='test', download=True, root=medmnist_root, size=64)
     images_np = dataset.imgs
 
-    print(f"Computing {vlm} embeddings for {len(images_np)} medical images...")
+    print(f"Computing {vlm} embeddings for {len(images_np)} {flag} images...")
 
-    _, preprocess, _ = get_vlm_model(vlm=vlm, device=device)
+    if vlm == 'biomedclip':
+        model, preprocess = _biomedclip(device)
+
+        def encode(batch):
+            with torch.no_grad():
+                e = model.encode_image(batch)
+            return e / e.norm(p=2, dim=-1, keepdim=True)
+    else:
+        _, preprocess, _ = get_vlm_model(vlm=vlm, device=device)
+
+        def encode(batch):
+            return get_image_features(batch, vlm=vlm, device=device)
 
     all_embeds = []
     for i in tqdm.tqdm(range(0, len(images_np), batch_size), desc=f"Encoding ({vlm})"):
@@ -61,13 +82,12 @@ def compute_medical_embeddings(vlm, device, batch_size=64):
             pil_images.append(preprocess(pil_img))
 
         batch_tensor = torch.stack(pil_images).to(device)
-        embeds = get_image_features(batch_tensor, vlm=vlm, device=device)
-        all_embeds.append(embeds.cpu())
+        all_embeds.append(encode(batch_tensor).cpu())
 
     all_embeds = torch.cat(all_embeds, dim=0)
     print(f"Embeddings shape: {all_embeds.shape}")
 
-    save_path = os.path.join(MEDICAL_DATA_ROOT, f'medical-{vlm}-test.pt')
+    save_path = embed_path(domain, vlm, MEDICAL_DATA_ROOT)
     torch.save(all_embeds, save_path)
     print(f"Saved to {save_path}")
     return save_path
@@ -117,11 +137,12 @@ def compute_uav_embeddings(vlm, device, data_root=UAV_DATA_ROOT,
 
 def main():
     parser = argparse.ArgumentParser(description='Compute VLM image embeddings')
-    parser.add_argument('--domain', required=True, choices=['medical', 'uav'],
-                        help='Dataset domain')
+    parser.add_argument('--domain', required=True, choices=['medical', 'pathmnist', 'uav'],
+                        help='Dataset domain (medical = ChestMNIST, pathmnist = PathMNIST)')
     parser.add_argument('--vlm', default='clip',
-                        choices=['clip', 'simclip4', 'simclip2', 'fare4', 'fare2', 'tecoa4', 'tecoa2', 'slade4', 'slade2'],
-                        help='VLM variant to use')
+                        choices=['clip', 'simclip4', 'simclip2', 'fare4', 'fare2', 'tecoa4', 'tecoa2', 'slade4', 'slade2',
+                                 'biomedclip'],
+                        help='VLM variant to use (biomedclip: medical domains only)')
     parser.add_argument('--gpu', type=int, default=0, help='GPU index')
     parser.add_argument('--batch-size', type=int, default=32)
     # UAV-specific
@@ -131,9 +152,11 @@ def main():
 
     device = f'cuda:{args.gpu}' if torch.cuda.is_available() else 'cpu'
 
-    if args.domain == 'medical':
-        compute_medical_embeddings(vlm=args.vlm, device=device, batch_size=args.batch_size)
+    if args.domain in ('medical', 'pathmnist'):
+        compute_medical_embeddings(vlm=args.vlm, device=device, batch_size=args.batch_size, domain=args.domain)
     elif args.domain == 'uav':
+        if args.vlm == 'biomedclip':
+            raise ValueError('biomedclip is a medical guide; use a CLIP variant for UAV')
         compute_uav_embeddings(vlm=args.vlm, device=device, data_root=args.data_root,
                                scenes=args.scenes, batch_size=args.batch_size)
 
