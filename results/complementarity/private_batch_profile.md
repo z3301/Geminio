@@ -27,6 +27,37 @@ Uniform gradient share would be 1/8 = 0.125; the two query-matched images togeth
 | tecoa4 | rigged | 0.122 | 0.033 | 0.0011 | 0.0512 | 6.801 | 61.250 |
 | tecoa4 | plain | 0.303 | 0.072 | 0.0010 | 0.0849 | 6.970 | 2.945 |
 | tecoa4 | swap | 0.116 | 0.339 | 0.0049 | 0.0888 | 6.933 | 144.590 |
+| laion2b | rigged | 0.110 | 0.158 | 0.0012 | 0.0247 | 7.069 | 62.926 |
+| laion2b | plain | 0.247 | 0.087 | 0.0042 | 0.1035 | 5.465 | 2.892 |
+| dinov2 | rigged | 0.194 | 0.066 | 0.0000 | 0.0336 | 11.371 | 10.817 |
+| dinov2 | plain | 0.304 | 0.077 | 0.0033 | 0.0900 | 5.715 | 2.943 |
+| in21k | rigged | 0.074 | 0.025 | 0.0020 | 0.0380 | 6.265 | 132.602 |
+| in21k | plain | 0.230 | 0.089 | 0.0059 | 0.1241 | 5.288 | 2.607 |
+
+## pathmnist
+
+| encoder | head | target share | alt-class share | target own prob | other own prob | target loss | other loss |
+|---|---|---|---|---|---|---|---|
+| clip | rigged | 0.720 | 0.000 | 0.0000 | 0.8202 | 126.284 | 17.720 |
+| clip | plain | 0.011 | 0.000 | 0.9964 | 0.9046 | 0.004 | 0.135 |
+| simclip2 | rigged | 0.844 | 0.000 | 0.0000 | 0.7875 | 63.430 | 1.367 |
+| simclip2 | plain | 0.142 | 0.000 | 0.9726 | 0.9478 | 0.028 | 0.057 |
+| simclip4 | rigged | 0.835 | 0.000 | 0.0000 | 0.7617 | 91.235 | 3.225 |
+| simclip4 | plain | 0.361 | 0.000 | 0.9511 | 0.9697 | 0.051 | 0.032 |
+| fare2 | rigged | 0.903 | 0.000 | 0.0000 | 0.7696 | 113.416 | 1.731 |
+| fare2 | plain | 0.008 | 0.000 | 0.9973 | 0.9005 | 0.003 | 0.139 |
+| fare4 | rigged | 0.915 | 0.000 | 0.0000 | 0.7927 | 87.313 | 1.032 |
+| fare4 | plain | 0.109 | 0.000 | 0.9903 | 0.9741 | 0.010 | 0.027 |
+| tecoa2 | rigged | 0.896 | 0.000 | 0.0000 | 0.8047 | 74.040 | 1.162 |
+| tecoa2 | plain | 0.106 | 0.000 | 0.9903 | 0.9749 | 0.010 | 0.026 |
+| tecoa4 | rigged | 0.920 | 0.000 | 0.0000 | 0.7939 | 88.335 | 0.936 |
+| tecoa4 | plain | 0.631 | 0.000 | 0.9513 | 0.9903 | 0.050 | 0.010 |
+| laion2b | rigged | 0.947 | 0.000 | 0.0000 | 0.8226 | 210.273 | 0.597 |
+| laion2b | plain | 0.636 | 0.000 | 0.9906 | 0.9983 | 0.009 | 0.002 |
+| dinov2 | rigged | 0.937 | 0.000 | 0.0000 | 0.7981 | 420.796 | 2.985 |
+| dinov2 | plain | 0.001 | 0.000 | 1.0000 | 0.9803 | 0.000 | 0.020 |
+| in21k | rigged | 0.937 | 0.000 | 0.0000 | 0.8333 | 405.793 | 5.812 |
+| in21k | plain | 0.009 | 0.000 | 1.0000 | 0.9988 | 0.000 | 0.001 |
 
 ## uav
 
@@ -53,43 +84,10 @@ Uniform gradient share would be 1/8 = 0.125; the two query-matched images togeth
 | tecoa4 | rigged | 0.600 | 0.207 | 0.2857 | 0.7765 | 328.795 | 14.151 |
 | tecoa4 | plain | 0.111 | 0.357 | 0.9099 | 0.8152 | 1.200 | 17.049 |
 | tecoa4 | swap | 0.174 | 0.282 | 0.5471 | 0.6156 | 10.217 | 197.430 |
+| laion2b | rigged | 0.526 | 0.308 | 0.2857 | 0.8154 | 481.937 | 80.773 |
+| laion2b | plain | 0.117 | 0.398 | 0.9298 | 0.7840 | 0.684 | 15.105 |
+| dinov2 | rigged | 0.381 | 0.241 | 0.4627 | 0.7304 | 35.071 | 13.792 |
+| dinov2 | plain | 0.040 | 0.357 | 0.9809 | 0.8663 | 0.162 | 11.003 |
+| in21k | rigged | 0.460 | 0.273 | 0.4537 | 0.8078 | 55.937 | 11.989 |
+| in21k | plain | 0.173 | 0.428 | 0.8223 | 0.8335 | 4.492 | 12.129 |
 
-
-## Reading (2026-10-31)
-
-Two of the 8 images are query-matched, so a head that treats the batch uniformly puts 0.250 of the
-last-layer gradient on them. Averaged over the 7 encoders:
-
-| domain | head | target gradient share | encoders above uniform | target/other loss ratio on this batch |
-|---|---|---|---|---|
-| UAV | plain | 0.150 (0.111–0.205) | 0/7 | 0.13x |
-| UAV | rigged | **0.519** (0.371–0.693) | **7/7** | **15.29x** |
-| UAV | swap | 0.097 (0.061–0.174) | 0/7 | 0.02x |
-| medical | plain | 0.287 (0.243–0.304) | 6/7 | 2.32x |
-| medical | rigged | **0.149** (0.096–0.269) | **1/7** | **0.20x** |
-| medical | swap | 0.151 (0.071–0.233) | 0/7 | 0.09x |
-
-**UAV: the assumed mechanism is confirmed directly.** Under the rigged head the two solar images carry
-roughly half the last-layer gradient, against 0.15 under an honest head, and their own-label
-probability drops to 0.14–0.60 while the rest of the batch stays at 0.68–0.78. Low confidence on the
-matched images and concentrated gradient appear together, as the account predicts, and neither appears
-without the rigged head. Swapping the query moves the concentration to the airstrip images
-(share 0.28–0.66) and leaves the solar images below uniform. So the head selects, the query decides
-what, and the effect is visible in the gradient before any reconstruction is attempted.
-
-**Medical: the mechanism never engages, which explains the domain null.** Under the rigged head the two
-pneumonia images carry *less* gradient than uniform on 6 of 7 encoders, and less than they carry under
-an honest head (0.149 against 0.287). On this batch their loss is a fifth of the other images', not a
-multiple of it, despite the head showing an 8–14x loss ratio on the auxiliary set. The head is
-amplifying something, but not the pneumonia images.
-
-This completes a chain that was previously inferred. Control B found that the attacker guides rank
-pneumonia at or below chance on the auxiliary set (AUROC 0.38–0.49). A head trained to amplify whatever
-the guide scores highly therefore learns to amplify a non-pneumonia subset, and on the private batch the
-targets get no amplification. That is a sufficient explanation for every downstream medical result: the
-near-zero selectivity, the reconstructions that never beat a random draw, and the apparent floor. It
-also means the medical null is a property of the guide's retrieval on this dataset, not evidence that
-the attack is harmless on medical imagery in general.
-
-Caveats: one batch per domain, single-label targets on medical, and the gradient norm is computed for
-the head's last layer only, so it does not account for what the frozen encoder contributes upstream.

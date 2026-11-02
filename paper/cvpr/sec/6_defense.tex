@@ -10,7 +10,7 @@ This is per-update aggregate DP, not record-level DP; a record-level variant wit
 \begin{table}[t]
 \centering
 \small
-\caption{\textbf{\nbfu at $\varepsilon=5$ against three reconstruction algorithms}, ResNet-18 client, base queries, target \lpips (mean of three seeds) and paired $\Delta$. The reference column is the random-draw value an uninformative reconstruction obtains; only numbers below it show recovery. \TODO{PathMNIST rows}}
+\caption{\textbf{\nbfu at $\varepsilon=5$ against three reconstruction algorithms}, ResNet-18 client, base queries, target \lpips (mean of three seeds) and paired $\Delta$. The reference column is the random-draw value an uninformative reconstruction obtains; only numbers below it show recovery.}
 \label{tab:defense}
 \begin{tabular}{llcccc}
 \toprule
@@ -20,8 +20,8 @@ Dataset & Attack & Undefended & \nbfu & $\Delta$ ($p$) & Reference \\
  & IG & 0.592 & 0.822 & +0.23 (.005) & \\
  & GradInversion & 0.922 & floor & -- & \\
 \midrule
-\multirow{2}{*}{PathMNIST} & HF-GradInv & \TODO{} & & & \\
- & IG & & & & \\
+\multirow{2}{*}{PathMNIST} & HF-GradInv & 0.534 & 0.802 & +0.27 (.013) & \multirow{2}{*}{0.42 [0.38, 0.45]} \\
+ & IG & 0.498 & 0.831 & +0.33 (.005) & \\
 \midrule
 \multirow{3}{*}{UAVScenes} & HF-GradInv & 0.470 & 0.689 & +0.22 (.108) & \multirow{3}{*}{0.54 [0.49, 0.57]} \\
  & IG & \textbf{0.453} & 0.727 & +0.27 (.002) & \\
@@ -34,7 +34,7 @@ Dataset & Attack & Undefended & \nbfu & $\Delta$ ($p$) & Reference \\
 On UAV the undefended IG attack sits below the 5th percentile of the random-draw reference, so its reconstruction carries signal, and \nbfu moves it to 0.727, above the reference: the defense removes a signal that was present (\cref{tab:defense}).
 Across the 24-query language sweep, \nbfu raises target \lpips on 12 of 12 UAV queries and 11 of 12 ChestMNIST queries (69 of 72 seed pairs under best-match, 63 of 72 under Hungarian matching), and that block survives Holm correction.
 Against HF-GradInv on a single batch the direction is the same in both domains but is not separable from seed noise at $n=3$.
-On ChestMNIST the undefended attack is already above the reference, so the defended numbers show that nothing was recovered either way, not that the defense stopped a recovery.
+On the two medical datasets the undefended attack is already at or above the reference, so the defended numbers show that nothing was recovered either way, not that the defense stopped a recovery. The PathMNIST contrasts are the largest in the table (+0.27 and +0.33, both significant at $n=3$) and still carry that caveat, which is why we read \cref{tab:defense} by the reference column and not by the size of $\Delta$.
 
 \paragraph{Noise, not clipping.}
 Clipping alone ($\sigma=0$) changes target \lpips by 0.03--0.06 in every condition, none significant; the budget sweep from $\varepsilon=0.1$ to $50$ gives the same defended values (0.80 ChestMNIST, 0.69 UAV) and so does the clipping bound from $C=0.1$ to $5$ at fixed $\varepsilon$.

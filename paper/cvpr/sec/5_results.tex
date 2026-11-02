@@ -59,7 +59,12 @@ This is consistent with an account of the ChestMNIST result that begins before r
 Because \cref{eq:geminio} normalizes the loss within each minibatch of 16 and $T=100$ makes the weight essentially one-hot, the objective pushes loss share onto the single most query-similar image of each minibatch; with a \pneu base rate of 1.2\% that image is almost never a target, whichever guide is used.
 Consistent with this, no ChestMNIST configuration in this study, across two client architectures, 24 queries, eight guides and three reconstruction algorithms, reaches a target \lpips below the 95th percentile of eight random draws from the dataset (best 0.377 against a reference of 0.327 [0.294, 0.361]).
 Two things we cannot separate here: the base rate and the retrieval quality both work against selection on this dataset, and 64\,px radiographs upscaled to 224\,px are mutually similar under \lpips, which compresses the range above the reference. What the profile adds is that the selection step is already absent, and it is measured before any reconstruction runs.
-\TODO{PathMNIST reconstruction: does the BiomedCLIP head's selection turn into selectivity above the reference (0.420 [0.383, 0.451] target \lpips, $-0.027$ selectivity) and target \lpips below it? Three-seed results land Nov 2.}
+PathMNIST separates the two factors more sharply, and against our expectation.
+There the BiomedCLIP head does select: it is the only medical ResNet-18 head above equal contribution (0.362 of the norm on the two tumor images).
+Yet it gives the \emph{worst} target \lpips of the eight guides (0.534, above the 95th percentile of this batch's random-draw reference of 0.420 [0.383, 0.451]), with best-match collapsing onto a single reconstruction in all three seeds.
+The seven CLIP-family guides, which select less, all land inside the reference range (0.404--0.450), and none of the eight reaches its 5th percentile.
+Retrieval does not predict reconstruction quality here: Spearman $\rho=+0.29$ ($p=.49$) between guide AUROC and target \lpips, flat across the CLIP family alone ($-0.07$).
+Concentrating the gradient on the targets is therefore not sufficient to recover them on this client, which is what the next subsection isolates.
 
 \subsection{Robust client backbones reveal what the head selects}
 \label{sec:backbone}
@@ -123,7 +128,7 @@ And on ChestMNIST every ViT-L client fails regardless of robustness (target \lpi
 \begin{table}[t]
 \centering
 \small
-\caption{\textbf{Guide VLM, ResNet-18 client.} Target \lpips, mean over three seeds, with the paired difference against vanilla CLIP as the guide; negative means a stronger attack. BiomedCLIP is the domain guide for the medical datasets. \TODO{PathMNIST column from results/nov-runs/pathmnist-resnet}}
+\caption{\textbf{Guide VLM, ResNet-18 client.} Target \lpips, mean over three seeds, with the paired difference against vanilla CLIP as the guide; negative means a stronger attack. BiomedCLIP is the domain guide for the medical datasets. On PathMNIST no guide differs from vanilla CLIP ($p\ge.09$).}
 \label{tab:guide}
 \begin{tabular}{lcccccc}
 \toprule
@@ -131,14 +136,14 @@ And on ChestMNIST every ViT-L client fails regardless of robustness (target \lpi
 \cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
 Guide & \lpips & $\Delta$ & \lpips & $\Delta$ & \lpips & $\Delta$ \\
 \midrule
-BiomedCLIP & 0.590 & $-$0.10 & \TODO{} & & -- & -- \\
-CLIP & 0.687 & -- & & -- & 0.470 & -- \\
-SimCLIP-2 & 0.448 & $-$0.24 & & & 0.473 & +0.00 \\
-SimCLIP-4 & 0.444 & $-$0.24 & & & 0.565 & +0.10 \\
-FARE-2 & \textbf{0.377} & $-$0.31 & & & 0.515 & +0.04 \\
-FARE-4 & 0.491 & $-$0.20 & & & 0.562 & +0.09 \\
-TeCoA-2 & 0.411 & $-$0.28 & & & 0.496 & +0.03 \\
-TeCoA-4 & 0.419 & $-$0.27 & & & 0.591 & +0.12 \\
+BiomedCLIP & 0.590 & $-$0.10 & 0.534 & +0.10 & -- & -- \\
+CLIP & 0.687 & -- & 0.439 & -- & 0.470 & -- \\
+SimCLIP-2 & 0.448 & $-$0.24 & 0.440 & +0.00 & 0.473 & +0.00 \\
+SimCLIP-4 & 0.444 & $-$0.24 & 0.423 & $-$0.02 & 0.565 & +0.10 \\
+FARE-2 & \textbf{0.377} & $-$0.31 & 0.450 & +0.01 & 0.515 & +0.04 \\
+FARE-4 & 0.491 & $-$0.20 & \textbf{0.404} & $-$0.03 & 0.562 & +0.09 \\
+TeCoA-2 & 0.411 & $-$0.28 & 0.439 & +0.00 & 0.496 & +0.03 \\
+TeCoA-4 & 0.419 & $-$0.27 & 0.426 & $-$0.01 & 0.591 & +0.12 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -147,7 +152,8 @@ When a robust CLIP replaces vanilla CLIP as the guide while the client stays a R
 This is not a targeting effect. \Cref{tab:profile} shows that none of these heads places more than a near-uniform share on the \pneu images, and non-target \lpips improves by as much as target \lpips (selectivity stays within $\pm0.07$ of zero for all guides).
 What changes is the loss regime: the robust-guide heads assign per-image losses two orders of magnitude larger than the vanilla-CLIP head to most of the batch, which makes the whole gradient easier to invert. Since these losses are driven by severe misclassification rather than by the targets specifically, we read the effect as a property of where head training lands, not of the query.
 On UAV, where retrieval differs by guide, there is no robust-guide effect on average (6 of 18 seed pairs), but top-decile retrieval precision tracks attack strength across the seven guides ($\rho=-0.86$, $p=.014$; AUROC against the same endpoint gives $-0.79$), and the guide that fails retrieval (TeCoA-4) gives the weakest attack.
-\TODO{PathMNIST: guide retrieval spreads 0.54--0.87 here, so this is the cleanest test of retrieval against attack strength within one dataset.}
+PathMNIST was designed as the cleanest within-dataset test of this, since its guides span 0.54--0.87 AUROC on the target class, and it comes out negative: the robust guides are indistinguishable from vanilla CLIP (paired $p\ge.09$ for all six, largest effect FARE-4 at $-0.034$), and the domain guide BiomedCLIP, with by far the best retrieval, is the weakest of the eight.
+So the ChestMNIST guide effect does not replicate on a second medical dataset, which is further reason to read it as a property of the loss regime rather than of retrieval or targeting.
 
 \subsection{Where the attack fails}
 \label{sec:failure}

@@ -48,6 +48,22 @@ Reference target LPIPS 0.327 [0.294, 0.361]; reference selectivity -0.016 [-0.04
 | ViT-L tecoa2 · rigged head | 0.790 | above p95 | -0.050 | below p5 |
 | ViT-L tecoa4 · rigged head | 0.775 | above p95 | -0.042 | inside |
 
+## pathmnist
+
+Reference target LPIPS 0.420 [0.383, 0.451]; reference selectivity -0.027 [-0.069, +0.032].
+
+| condition | target LPIPS | vs reference | selectivity | vs reference |
+|---|---|---|---|---|
+| ResNet-18 · pathmnist_tum_base_ho | 0.534 | above p95 | +0.017 | inside |
+| ResNet-18 · pathmnist_tum_base_ig_ho | 0.498 | above p95 | +0.004 | inside |
+| ResNet-18 · pathmnist_vlmclip_ho | 0.439 | inside | -0.065 | inside |
+| ResNet-18 · pathmnist_vlmfare2_ho | 0.450 | inside | -0.063 | inside |
+| ResNet-18 · pathmnist_vlmfare4_ho | 0.404 | inside | -0.000 | inside |
+| ResNet-18 · pathmnist_vlmsimclip2_ho | 0.440 | inside | -0.050 | inside |
+| ResNet-18 · pathmnist_vlmsimclip4_ho | 0.423 | inside | -0.043 | inside |
+| ResNet-18 · pathmnist_vlmtecoa2_ho | 0.439 | inside | -0.035 | inside |
+| ResNet-18 · pathmnist_vlmtecoa4_ho | 0.426 | inside | -0.029 | inside |
+
 ## uav
 
 Reference target LPIPS 0.535 [0.485, 0.571]; reference selectivity +0.035 [-0.003, +0.086].

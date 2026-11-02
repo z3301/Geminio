@@ -73,4 +73,40 @@ target LPIPS 0.420 [5th-95th percentile 0.383, 0.451], selectivity -0.027 [-0.06
 0.518 [0.405, 0.600]. The other seven batch images score 0.398 against the targets, the batch mean 0.374. So PathMNIST
 leaves more headroom than ChestMNIST (0.327) and less than UAV (0.535).
 
-_(attack results filled in as the queue lands; group A seed 42 landed 14:16, full group A ~15:10)_
+**Group A, ResNet-18 client, 33 runs, 3 seeds, finished 15:13 (`results/nov_runs/pathmnist_resnet/summary.md`).
+Three of the four expectations above are NOT met, and the direction of (3) is reversed.**
+
+| guide | AUROC | target share | target LPIPS | vs reference | selectivity | distinct recons |
+|---|---|---|---|---|---|---|
+| BiomedCLIP | 0.87 | 0.362 | 0.534 | above p95 | +0.017 | 1.0 |
+| TeCoA-4 | 0.78 | 0.205 | 0.426 | inside | -0.029 | 2.7 |
+| FARE-4 | 0.69 | 0.208 | **0.404** | inside | -0.000 | 3.0 |
+| TeCoA-2 | 0.69 | 0.150 | 0.439 | inside | -0.035 | 2.3 |
+| FARE-2 | 0.67 | 0.173 | 0.450 | inside | -0.063 | 2.7 |
+| CLIP | 0.60 | 0.266 | 0.439 | inside | -0.065 | 3.7 |
+| SimCLIP-2 | 0.56 | 0.135 | 0.440 | inside | -0.050 | 3.7 |
+| SimCLIP-4 | 0.54 | 0.154 | 0.423 | inside | -0.043 | 3.0 |
+
+1. **(4) No recovery.** Nothing reaches the 5th percentile of the random-draw reference (0.383). Seven guides sit
+   inside the reference range and BiomedCLIP is above its 95th percentile, i.e. worse than an uninformative draw.
+   PathMNIST therefore joins ChestMNIST: on a ResNet-18 client, target LPIPS never evidences recovery, even though the
+   reference leaves more headroom here (0.420) than on chest X-rays (0.327).
+2. **(2) Selectivity fails.** Only BiomedCLIP is positive (+0.017) and that value is inside the reference range
+   (-0.027 [-0.069, +0.032]); all seven CLIP-family guides are negative.
+3. **(3) Reversed.** Retrieval does NOT predict attack strength here: Spearman(AUROC, target LPIPS) = +0.29
+   (p = .49), and the sign means better retrieval goes with *worse* reconstruction; across the CLIP family alone it is
+   flat (-0.07, p = .88). Under Hungarian matching the reverse trend is stronger (+0.62, p = .10).
+4. **The decisive observation: the head that selects most reconstructs worst.** BiomedCLIP is the only medical
+   ResNet-18 head above equal contribution (0.362 of the last-layer gradient norm on the two tumor images) and it gives
+   the worst target LPIPS of the eight, with best-match collapsing onto a single reconstruction in all three seeds
+   (distinct recons = 1.0). So on this client, concentrating the gradient on the targets is not sufficient for
+   recovering them; compare the UAV client, where the same concentration does yield recovery.
+   This separates the two factors more sharply than any of the earlier controls, and it is the reason the ViT-L runs
+   (group C, in flight) matter: those heads place 0.72-0.95 on the targets.
+5. **NBFU.** eps = 5 raises target LPIPS from 0.534 to 0.802 against HF-GradInv (paired d +0.268, p = .013) and from
+   0.498 to 0.831 against IG (+0.333, p = .005). As on ChestMNIST, the undefended arm was already at or above the
+   reference, so this shows the defended arm recovers nothing, not that a demonstrated recovery was removed.
+
+**Caveats.** One private batch, three seeds; best-match collapses in several arms, so the Hungarian columns of
+`summary.md` should be read alongside; the AUROC-vs-strength test has n = 8 guides.
+
